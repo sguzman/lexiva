@@ -570,7 +570,7 @@ impl SourceManager {
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) {
-        egui::CollapsingHeader::new("Dictionary sources — discover and import")
+        egui::CollapsingHeader::new("Dictionary sources  ·  Scan and import")
             .id_salt("lexiva_dictionary_manager")
             .show(ui, |ui| {
                 ui.label("Scan installed DICT directories, optionally including another directory.");

@@ -284,30 +284,43 @@ impl LexivaApp {
     }
 
     fn render_empty(&self, ui: &mut egui::Ui) {
-        ui.add_space(55.0);
-        ui.vertical_centered(|ui| {
-            if self.sources.is_empty() {
-                ui.heading("A dictionary you control.");
-                ui.label("No dictionary sources have been indexed yet.");
-                ui.weak("Use the source manager above to scan for installed dictionaries or import a local file.");
-            } else if self.scope == SearchScope::Unselected {
-                ui.heading("Choose a dictionary to search.");
-                ui.weak(
-                    "No dictionaries are queried automatically. Select one source, or explicitly choose all indexed sources.",
-                );
-            } else if self.query.trim().is_empty() {
-                ui.heading("Find a word.");
-                ui.weak("Type an English or Spanish headword to search the selected index.");
-            } else if !self.pending && self.error.is_none() {
-                ui.heading("No matching headwords.");
-                ui.weak("Try a shorter prefix or a different indexed dictionary.");
-            }
-        });
+        let colors = theme::palette(ui.visuals().dark_mode);
+        ui.add_space(16.0);
+        egui::Frame::new()
+            .fill(colors.surface)
+            .stroke(egui::Stroke::new(1.0, colors.border))
+            .corner_radius(egui::CornerRadius::same(12))
+            .inner_margin(egui::Margin::same(24))
+            .show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                ui.add_space(16.0);
+                ui.vertical_centered(|ui| {
+                    if self.sources.is_empty() {
+                        ui.label(egui::RichText::new("Your library starts here").size(23.0).strong());
+                        ui.add_space(8.0);
+                        ui.label("No dictionaries have been indexed yet.");
+                        ui.label(egui::RichText::new("Open Dictionary sources above to scan installed DICT files or import a Wiktionary dataset.").color(colors.secondary));
+                    } else if self.scope == SearchScope::Unselected {
+                        ui.label(egui::RichText::new("Choose a dictionary").size(22.0).strong());
+                        ui.add_space(8.0);
+                        ui.label("Select a source above to begin searching.");
+                    } else if self.query.trim().is_empty() {
+                        ui.label(egui::RichText::new("Discover a word").size(22.0).strong());
+                        ui.add_space(8.0);
+                        ui.label("Type an English or Spanish word to explore its meanings.");
+                    } else if !self.pending && self.error.is_none() {
+                        ui.label(egui::RichText::new("No matches found").size(22.0).strong());
+                        ui.add_space(8.0);
+                        ui.label("Try another spelling, shorter prefix, or dictionary.");
+                    }
+                });
+                ui.add_space(16.0);
+            });
     }
 }
 
-impl eframe::App for LexivaApp {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+impl LexivaApp {
+    fn render_screen(&mut self, ui: &mut egui::Ui) {
         if let Some(mode) = self
             .darkman_watcher
             .as_ref()
@@ -344,11 +357,12 @@ impl eframe::App for LexivaApp {
             self.dispatch_search();
         }
 
-        ui.add_space(10.0);
+        let colors = theme::palette(ui.visuals().dark_mode);
         ui.horizontal(|ui| {
-            ui.heading("Lexiva");
-            ui.separator();
-            ui.weak("Offline dictionary reader");
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("Lexiva").size(30.0).strong().color(colors.accent));
+                ui.label(egui::RichText::new("Your offline dictionary library").size(13.0).color(colors.secondary));
+            });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let previous = self.theme;
                 egui::ComboBox::from_id_salt("lexiva_appearance")
@@ -402,13 +416,28 @@ impl eframe::App for LexivaApp {
                 });
             });
         });
-        ui.separator();
-
-        if let Some(manager) = &mut self.manager {
-            manager.show(ui);
-        }
-        ui.add_space(6.0);
-
+        ui.add_space(18.0);
+        egui::Frame::new()
+            .fill(colors.surface)
+            .stroke(egui::Stroke::new(1.0, colors.border))
+            .corner_radius(egui::CornerRadius::same(12))
+            .inner_margin(egui::Margin::same(16))
+            .show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                if let Some(manager) = &mut self.manager {
+                    manager.show(ui);
+                }
+            });
+        ui.add_space(14.0);
+        egui::Frame::new()
+            .fill(colors.surface)
+            .stroke(egui::Stroke::new(1.0, colors.border))
+            .corner_radius(egui::CornerRadius::same(12))
+            .inner_margin(egui::Margin::same(16))
+            .show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                ui.label(egui::RichText::new("LOOK UP A WORD").size(12.0).strong().color(colors.secondary));
+                ui.add_space(6.0);
         ui.horizontal(|ui| {
             ui.label("Dictionary");
             let previous = self.scope.clone();
@@ -520,8 +549,10 @@ impl eframe::App for LexivaApp {
         {
             self.move_selection(-1);
         }
-        ui.add_space(5.0);
-        ui.label("Keyboard: Ctrl+L focus lookup · ↑/↓ select results · Alt+↑/↓ history · Ctrl+Enter copy");
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new("Ctrl+L focus  ·  ↑↓ select  ·  Alt+↑↓ history  ·  Ctrl+Enter copy").size(12.0).color(colors.secondary));
+            });
+        ui.add_space(10.0);
         if self.pending {
             ui.horizontal(|ui| {
                 ui.spinner();
@@ -531,7 +562,6 @@ impl eframe::App for LexivaApp {
         if let Some(error) = &self.error {
             ui.colored_label(ui.visuals().error_fg_color, error);
         }
-        ui.separator();
         ui.horizontal(|ui| {
             ui.label("Definition text size");
             ui.add(
@@ -569,6 +599,7 @@ impl eframe::App for LexivaApp {
             return;
         }
 
+        ui.add_space(10.0);
         ui.columns(2, |columns| {
             columns[0].heading(format!("Results ({})", self.hits.len()));
             columns[0].add_space(4.0);
@@ -614,6 +645,30 @@ impl eframe::App for LexivaApp {
                     }
                 });
         });
+    }
+}
+
+impl eframe::App for LexivaApp {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // Eframe's root Ui is transparent by default. Without a painted panel,
+        // a Light theme renders dark text over the viewport's black clear color.
+        // The central panel paints the full viewport in the active theme and
+        // adds an actual inset, preventing text/widgets from touching the edge.
+        let background = ui.visuals().panel_fill;
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(background)
+                    .inner_margin(egui::Margin::symmetric(22, 18)),
+            )
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
+                        self.render_screen(ui);
+                    });
+            });
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {

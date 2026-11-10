@@ -209,12 +209,56 @@ pub fn configure_system_font(ctx: &egui::Context) {
     }
 }
 
+/// Consistent light/dark surfaces, so the root background and controls never
+/// use different appearance modes. All colors are semantic, not widget-local.
+#[derive(Clone, Copy)]
+pub struct Palette {
+    pub canvas: egui::Color32,
+    pub surface: egui::Color32,
+    pub border: egui::Color32,
+    pub primary: egui::Color32,
+    pub secondary: egui::Color32,
+    pub accent: egui::Color32,
+}
+
+pub fn palette(dark: bool) -> Palette {
+    if dark {
+        Palette {
+            canvas: egui::Color32::from_rgb(18, 23, 32),
+            surface: egui::Color32::from_rgb(29, 35, 45),
+            border: egui::Color32::from_rgb(61, 70, 82),
+            primary: egui::Color32::from_rgb(239, 242, 246),
+            secondary: egui::Color32::from_rgb(175, 187, 202),
+            accent: egui::Color32::from_rgb(234, 151, 155),
+        }
+    } else {
+        Palette {
+            canvas: egui::Color32::from_rgb(245, 246, 249),
+            surface: egui::Color32::WHITE,
+            border: egui::Color32::from_rgb(218, 223, 231),
+            primary: egui::Color32::from_rgb(34, 41, 53),
+            secondary: egui::Color32::from_rgb(94, 103, 118),
+            accent: egui::Color32::from_rgb(156, 66, 75),
+        }
+    }
+}
+
 /// Identity colors derived from the Lexiva name (OKLCH hue 16°).
-/// Accessible contrast and external Hyprland theme changes require runtime QA.
+/// Root panels must be painted with the matching `panel_fill`.
 pub fn configure_palette(ctx: &egui::Context, high_contrast: bool) {
+    let light_palette = palette(false);
     let mut light = egui::Visuals::light();
-    light.hyperlink_color = egui::Color32::from_rgb(156, 66, 75);
+    light.panel_fill = light_palette.canvas;
+    light.window_fill = light_palette.surface;
+    light.extreme_bg_color = egui::Color32::from_rgb(237, 239, 244);
+    light.weak_text_color = Some(light_palette.secondary);
+    light.widgets.noninteractive.fg_stroke.color = light_palette.primary;
+    light.widgets.inactive.fg_stroke.color = light_palette.primary;
+    light.widgets.inactive.bg_stroke.color = light_palette.border;
+    light.widgets.noninteractive.bg_stroke.color = light_palette.border;
+    light.hyperlink_color = light_palette.accent;
     light.selection.bg_fill = egui::Color32::from_rgb(156, 66, 75);
+    light.selection.stroke.color = egui::Color32::WHITE;
     if high_contrast {
         light.weak_text_color = Some(egui::Color32::from_rgb(55, 55, 55));
         light.widgets.noninteractive.fg_stroke.color = egui::Color32::from_rgb(22, 22, 22);
@@ -223,9 +267,19 @@ pub fn configure_palette(ctx: &egui::Context, high_contrast: bool) {
     }
     ctx.set_visuals_of(egui::Theme::Light, light);
 
+    let dark_palette = palette(true);
     let mut dark = egui::Visuals::dark();
-    dark.hyperlink_color = egui::Color32::from_rgb(234, 151, 155);
+    dark.panel_fill = dark_palette.canvas;
+    dark.window_fill = dark_palette.surface;
+    dark.extreme_bg_color = egui::Color32::from_rgb(37, 44, 56);
+    dark.weak_text_color = Some(dark_palette.secondary);
+    dark.widgets.noninteractive.fg_stroke.color = dark_palette.primary;
+    dark.widgets.inactive.fg_stroke.color = dark_palette.primary;
+    dark.widgets.inactive.bg_stroke.color = dark_palette.border;
+    dark.widgets.noninteractive.bg_stroke.color = dark_palette.border;
+    dark.hyperlink_color = dark_palette.accent;
     dark.selection.bg_fill = egui::Color32::from_rgb(156, 66, 75);
+    dark.selection.stroke.color = egui::Color32::WHITE;
     if high_contrast {
         dark.weak_text_color = Some(egui::Color32::from_rgb(222, 222, 222));
         dark.widgets.noninteractive.fg_stroke.color = egui::Color32::from_rgb(245, 245, 245);
@@ -233,12 +287,16 @@ pub fn configure_palette(ctx: &egui::Context, high_contrast: bool) {
         dark.selection.stroke.color = egui::Color32::WHITE;
     }
     ctx.set_visuals_of(egui::Theme::Dark, dark);
+    ctx.all_styles_mut(|style| {
+        style.spacing.item_spacing = egui::vec2(10.0, 7.0);
+        style.spacing.button_padding = egui::vec2(11.0, 6.0);
+    });
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        ThemeChoice, configure_motion, configure_palette, high_contrast_from_storage,
+        ThemeChoice, configure_motion, configure_palette, high_contrast_from_storage, palette,
         interface_scale_from_storage, reader_scale_from_storage, reduced_motion_from_storage,
     };
 
@@ -369,7 +427,7 @@ mod tests {
             ctx.style_of(eframe::egui::Theme::Light)
                 .visuals
                 .weak_text_color,
-            None
+            Some(palette(false).secondary)
         );
         assert!(high_contrast_from_storage(Some("true")));
         assert!(!high_contrast_from_storage(Some("false")));
@@ -391,6 +449,23 @@ mod tests {
         let l1 = luminance(a);
         let l2 = luminance(b);
         (l1.max(l2) + 0.05) / (l1.min(l2) + 0.05)
+    }
+
+    #[test]
+    fn light_and_dark_surfaces_have_legible_text_and_distinct_canvas() {
+        let ctx = eframe::egui::Context::default();
+        configure_palette(&ctx, false);
+        for mode in [eframe::egui::Theme::Light, eframe::egui::Theme::Dark] {
+            let dark = mode == eframe::egui::Theme::Dark;
+            let expected = palette(dark);
+            let visuals = &ctx.style_of(mode).visuals;
+            assert_eq!(visuals.panel_fill, expected.canvas);
+            assert_eq!(visuals.window_fill, expected.surface);
+            assert!(contrast(expected.primary, expected.canvas) >= 7.0);
+            assert!(contrast(expected.secondary, expected.canvas) >= 4.5);
+            assert!(contrast(visuals.selection.stroke.color, visuals.selection.bg_fill) >= 4.5);
+            assert_ne!(expected.canvas, expected.surface);
+        }
     }
 
     #[test]
