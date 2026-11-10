@@ -27,7 +27,7 @@ pub struct DiscoveredDict {
 
 enum Command {
     Scan(Option<PathBuf>),
-    ImportDict(DiscoveredDict),
+    ImportDict(Box<DiscoveredDict>),
     ImportJsonl {
         path: PathBuf,
         edition: WiktionaryEdition,
@@ -324,7 +324,7 @@ impl SourceManager {
                             .add_enabled(!self.busy, egui::Button::new("Import / reindex"))
                             .clicked()
                         {
-                            self.start(Command::ImportDict(candidate.clone()));
+                            self.start(Command::ImportDict(Box::new(candidate.clone())));
                         }
                     });
                     ui.small(candidate.files.index.display().to_string());
