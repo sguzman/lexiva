@@ -133,7 +133,10 @@ fn corpus_150k_records_import_cancel_reimport_and_measure_resources() {
     assert!(matches!(cancelled, Err(StoreError::Cancelled)));
     assert_eq!(store.count_entries(&src.id).unwrap(), SELECTED as i64);
     assert_eq!(store.staged_count(&src.id).unwrap(), 0);
-    assert_eq!(store.get_entry(&src.id, "jsonl-line:150000").unwrap(), unchanged);
+    assert_eq!(
+        store.get_entry(&src.id, "jsonl-line:150000").unwrap(),
+        unchanged
+    );
 
     // Reimport the same source and make sure FTS and published IDs remain
     // consistent; the input file must not be rewritten by either operation.
@@ -149,7 +152,10 @@ fn corpus_150k_records_import_cancel_reimport_and_measure_resources() {
     assert_eq!(reimported, SELECTED);
     assert_eq!(store.count_entries(&src.id).unwrap(), SELECTED as i64);
     assert_eq!(store.staged_count(&src.id).unwrap(), 0);
-    assert_eq!(store.get_entry(&src.id, "jsonl-line:150000").unwrap(), unchanged);
+    assert_eq!(
+        store.get_entry(&src.id, "jsonl-line:150000").unwrap(),
+        unchanged
+    );
     assert_eq!(source_bytes, fs::metadata(&source_path).unwrap().len());
     store.check_fts_index().unwrap();
 
@@ -157,8 +163,15 @@ fn corpus_150k_records_import_cancel_reimport_and_measure_resources() {
     let rss = peak_rss_kib();
     eprintln!(
         "LEXIVA CORPUS: generated={} selected={} compressed_bytes={} db_first_bytes={} db_final_bytes={} peak_rss_kib={:?} generate_elapsed={:?} first_import={:?} reimport={:?}",
-        RECORDS, SELECTED, source_bytes, first_db_bytes, final_db_bytes,
-        rss, generated_at.elapsed(), import_elapsed, reimport_at.elapsed()
+        RECORDS,
+        SELECTED,
+        source_bytes,
+        first_db_bytes,
+        final_db_bytes,
+        rss,
+        generated_at.elapsed(),
+        import_elapsed,
+        reimport_at.elapsed()
     );
     assert!(first_db_bytes > source_bytes);
     assert!(final_db_bytes > 0);

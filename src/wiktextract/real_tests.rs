@@ -56,13 +56,13 @@ fn check_sample(env_key: &str, edition: WiktionaryEdition, word: &str) {
     assert!(entries.iter().any(|entry| !entry.senses.is_empty()));
     for (entry, original) in entries.iter().zip(expected.iter()) {
         assert_eq!(&entry.metadata["wiktextract_record"], *original);
-        assert_eq!(
-            entry.part_of_speech.as_deref(),
-            original["pos"].as_str()
+        assert_eq!(entry.part_of_speech.as_deref(), original["pos"].as_str());
+        assert!(
+            entry
+                .senses
+                .iter()
+                .all(|sense| { sense.definition_language.as_deref() == Some(edition.code()) })
         );
-        assert!(entry.senses.iter().all(|sense| {
-            sense.definition_language.as_deref() == Some(edition.code())
-        }));
         if let Some(glosses) = original["senses"].as_array() {
             assert_eq!(entry.senses.len(), glosses.len());
             for (sense, raw_sense) in entry.senses.iter().zip(glosses.iter()) {
@@ -100,7 +100,10 @@ fn check_sample(env_key: &str, edition: WiktionaryEdition, word: &str) {
         word,
         count,
         contents.len(),
-        entries.iter().map(|entry| entry.part_of_speech.as_deref()).collect::<Vec<_>>()
+        entries
+            .iter()
+            .map(|entry| entry.part_of_speech.as_deref())
+            .collect::<Vec<_>>()
     );
 }
 
