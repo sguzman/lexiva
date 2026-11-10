@@ -21,6 +21,10 @@ fn main() -> eframe::Result<()> {
             .with_inner_size([1024.0, 720.0])
             .with_min_inner_size([760.0, 500.0])
             .with_app_id("lexiva"),
+        // eframe persists the last native window geometry via its storage.
+        // Wayland compositors still control the absolute screen position.
+        persist_window: true,
+        system_font_fallback: true,
         ..Default::default()
     };
 

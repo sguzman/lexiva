@@ -134,6 +134,35 @@ pub fn reader_scale_from_storage(value: Option<&str>) -> f32 {
     }
 }
 
+/// Restore only bounded interface scales from native app storage.
+pub fn interface_scale_from_storage(value: Option<&str>) -> f32 {
+    let Some(scale) = value.and_then(|raw| raw.parse::<f32>().ok()) else {
+        return 1.0;
+    };
+    if scale.is_finite() && (0.75..=2.5).contains(&scale) {
+        scale
+    } else {
+        1.0
+    }
+}
+
+pub fn reduced_motion_from_storage(value: Option<&str>) -> bool {
+    value == Some("true")
+}
+
+/// Applies to light and dark styles, including theme transitions.
+/// No animation timer is started while reduction is enabled.
+pub fn configure_motion(ctx: &egui::Context, reduced_motion: bool) {
+    ctx.all_styles_mut(|style| {
+        style.animation_time = if reduced_motion { 0.0 } else { 0.2 };
+        style.scroll_animation.duration = if reduced_motion {
+            egui::Rangef::new(0.0, 0.0)
+        } else {
+            egui::Rangef::new(0.1, 0.3)
+        };
+    });
+}
+
 /// Use the locally selected Fontconfig sans-serif, retaining embedded egui
 /// fonts for fallback glyphs. Lexiva never bundles third-party font files.
 pub fn configure_system_font(ctx: &egui::Context) {
@@ -192,7 +221,10 @@ pub fn configure_palette(ctx: &egui::Context) {
 
 #[cfg(test)]
 mod tests {
-    use super::{ThemeChoice, reader_scale_from_storage};
+    use super::{
+        ThemeChoice, configure_motion, interface_scale_from_storage, reader_scale_from_storage,
+        reduced_motion_from_storage,
+    };
 
     #[test]
     fn darkman_notifications_accept_only_explicit_modes() {
@@ -267,6 +299,36 @@ mod tests {
         assert_eq!(reader_scale_from_storage(Some("0.8")), 0.8);
         for raw in ["", "nan", "inf", "-1", "0.2", "1.7", "broken"] {
             assert_eq!(reader_scale_from_storage(Some(raw)), 1.0);
+        }
+    }
+
+    #[test]
+    fn interface_zoom_and_motion_preferences_fail_safely() {
+        assert_eq!(interface_scale_from_storage(None), 1.0);
+        assert_eq!(interface_scale_from_storage(Some("1.75")), 1.75);
+        for invalid in ["", "NaN", "-1", "inf", "0.1", "6.0"] {
+            assert_eq!(interface_scale_from_storage(Some(invalid)), 1.0);
+        }
+        assert!(reduced_motion_from_storage(Some("true")));
+        for invalid in [None, Some("false"), Some("yes"), Some("")] {
+            assert!(!reduced_motion_from_storage(invalid));
+        }
+    }
+
+    #[test]
+    fn reduced_motion_updates_both_theme_styles() {
+        let ctx = eframe::egui::Context::default();
+        configure_motion(&ctx, true);
+        for mode in [eframe::egui::Theme::Light, eframe::egui::Theme::Dark] {
+            let style = ctx.style_of(mode);
+            assert_eq!(style.animation_time, 0.0);
+            assert_eq!(style.scroll_animation.duration, eframe::egui::Rangef::new(0.0, 0.0));
+        }
+        configure_motion(&ctx, false);
+        for mode in [eframe::egui::Theme::Light, eframe::egui::Theme::Dark] {
+            let style = ctx.style_of(mode);
+            assert_eq!(style.animation_time, 0.2);
+            assert_eq!(style.scroll_animation.duration, eframe::egui::Rangef::new(0.1, 0.3));
         }
     }
 

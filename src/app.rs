@@ -1,6 +1,6 @@
 //! Native egui search shell consuming the derived SQLite catalog.
-//! Dictionary discovery/import controls and persistence of enabled sources
-//! are separate M06 tasks. Searching every source requires explicit opt-in.
+//! Keyboard navigation respects focused controls; querying every dictionary
+//! requires an explicit opt-in.
 
 use eframe::egui;
 
@@ -16,6 +16,8 @@ const READER_SCALE_KEY: &str = "lexiva.reader_scale.v1";
 const SCOPE_KEY: &str = "lexiva.search_scope.v1";
 const HEADWORD_LANGUAGE_KEY: &str = "lexiva.headword_language.v1";
 const DEFINITION_LANGUAGE_KEY: &str = "lexiva.definition_language.v1";
+const INTERFACE_SCALE_KEY: &str = "lexiva.interface_scale.v1";
+const REDUCED_MOTION_KEY: &str = "lexiva.reduced_motion.v1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct EntryKey {
@@ -34,6 +36,16 @@ impl EntryKey {
     fn matches(&self, hit: &SearchHit) -> bool {
         self.source_id == hit.entry.source_id && self.entry_id == hit.entry.source_entry_id
     }
+}
+
+/// Search navigation must not intercept keys owned by any other focused
+/// widget (including source-manager inputs, menus and language filters).
+fn lookup_shortcuts_allowed(
+    window_focused: bool,
+    focused_widget: Option<egui::Id>,
+    lookup_widget: egui::Id,
+) -> bool {
+    window_focused && focused_widget.is_none_or(|id| id == lookup_widget)
 }
 
 #[derive(Default)]
@@ -81,6 +93,8 @@ pub struct LexivaApp {
     darkman_watcher: Option<theme::DarkmanWatcher>,
     last_system_theme: Option<ThemeChoice>,
     reader_scale: f32,
+    interface_scale: f32,
+    reduced_motion: bool,
     query: String,
     headword_language: String,
     definition_language: String,
@@ -101,6 +115,18 @@ impl LexivaApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         theme::configure_palette(&cc.egui_ctx);
         theme::configure_system_font(&cc.egui_ctx);
+        let interface_scale = theme::interface_scale_from_storage(
+            cc.storage
+                .and_then(|storage| storage.get_string(INTERFACE_SCALE_KEY))
+                .as_deref(),
+        );
+        cc.egui_ctx.set_zoom_factor(interface_scale);
+        let reduced_motion = theme::reduced_motion_from_storage(
+            cc.storage
+                .and_then(|storage| storage.get_string(REDUCED_MOTION_KEY))
+                .as_deref(),
+        );
+        theme::configure_motion(&cc.egui_ctx, reduced_motion);
         let reader_scale = theme::reader_scale_from_storage(
             cc.storage
                 .and_then(|storage| storage.get_string(READER_SCALE_KEY))
@@ -158,6 +184,8 @@ impl LexivaApp {
             darkman_watcher,
             last_system_theme: None,
             reader_scale,
+            interface_scale,
+            reduced_motion,
             query: String::new(),
             headword_language,
             definition_language,
@@ -253,9 +281,7 @@ impl LexivaApp {
             if self.sources.is_empty() {
                 ui.heading("A dictionary you control.");
                 ui.label("No dictionary sources have been indexed yet.");
-                ui.weak(
-                    "Read-only dictionary discovery and indexing controls are next in the source manager.",
-                );
+                ui.weak("Use the source manager above to scan for installed dictionaries or import a local file.");
             } else if self.scope == SearchScope::Unselected {
                 ui.heading("Choose a dictionary to search.");
                 ui.weak(
@@ -285,6 +311,8 @@ impl eframe::App for LexivaApp {
             }
         }
         self.receive_updates();
+        // Also preserve egui's native Ctrl+Plus/Minus/0 zoom shortcuts.
+        self.interface_scale = ui.ctx().zoom_factor();
         let changed = self.manager.as_mut().and_then(SourceManager::poll);
         if let Some(change) = changed {
             match change {
@@ -331,6 +359,33 @@ impl eframe::App for LexivaApp {
                     }
                 }
                 ui.label("Appearance");
+                ui.separator();
+                ui.menu_button("Accessibility", |ui| {
+                    ui.label("Interface scale");
+                    let mut scale = self.interface_scale.clamp(0.75, 2.0);
+                    if ui
+                        .add(
+                            egui::Slider::new(&mut scale, 0.75..=2.0)
+                                .step_by(0.05)
+                                .suffix("×"),
+                        )
+                        .changed()
+                    {
+                        self.interface_scale = scale;
+                        ui.ctx().set_zoom_factor(scale);
+                    }
+                    if ui.button("Reset interface zoom").clicked() {
+                        self.interface_scale = 1.0;
+                        ui.ctx().set_zoom_factor(1.0);
+                    }
+                    if ui
+                        .checkbox(&mut self.reduced_motion, "Reduce animations")
+                        .changed()
+                    {
+                        theme::configure_motion(ui.ctx(), self.reduced_motion);
+                    }
+                    ui.label("Ctrl+Plus/Minus/0 also adjusts interface zoom.");
+                });
             });
         });
         ui.separator();
@@ -407,8 +462,13 @@ impl eframe::App for LexivaApp {
         if submitted && response.has_focus() {
             self.history.remember(&self.query);
         }
-        let copy_shortcut =
-            ui.input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::Enter));
+        let shortcut_context = lookup_shortcuts_allowed(
+            ui.input(|input| input.focused),
+            ui.ctx().memory(|memory| memory.focused()),
+            response.id,
+        );
+        let copy_shortcut = shortcut_context
+            && ui.input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::Enter));
         if copy_shortcut
             && let Some(hit) = self
                 .selected
@@ -421,10 +481,10 @@ impl eframe::App for LexivaApp {
         // History is intentionally session-only for now. Ctrl+L focuses
         // lookup, Alt+Up/Down traverses submitted terms, ordinary arrows
         // select search results, and Ctrl+Enter copies the selected result.
-        let history_up =
-            ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp));
-        let history_down =
-            ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown));
+        let history_up = shortcut_context
+            && ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp));
+        let history_down = shortcut_context
+            && ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown));
         let recalled = if history_up {
             self.history.previous().map(str::to_owned)
         } else if history_down {
@@ -436,13 +496,18 @@ impl eframe::App for LexivaApp {
             self.query = query;
             self.dispatch_search();
         }
-        if ui.input(|input| !input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown)) {
+        if shortcut_context
+            && ui.input(|input| !input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown))
+        {
             self.move_selection(1);
         }
-        if ui.input(|input| !input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp)) {
+        if shortcut_context
+            && ui.input(|input| !input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp))
+        {
             self.move_selection(-1);
         }
         ui.add_space(5.0);
+        ui.label("Keyboard: Ctrl+L focus lookup · ↑/↓ select results · Alt+↑/↓ history · Ctrl+Enter copy");
         if self.pending {
             ui.horizontal(|ui| {
                 ui.spinner();
@@ -543,12 +608,25 @@ impl eframe::App for LexivaApp {
         storage.set_string(SCOPE_KEY, self.scope.storage_value());
         storage.set_string(HEADWORD_LANGUAGE_KEY, self.headword_language.clone());
         storage.set_string(DEFINITION_LANGUAGE_KEY, self.definition_language.clone());
+        storage.set_string(INTERFACE_SCALE_KEY, format!("{:.2}", self.interface_scale));
+        storage.set_string(REDUCED_MOTION_KEY, self.reduced_motion.to_string());
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lookup_navigation_does_not_capture_other_controls_or_background_windows() {
+        let lookup = egui::Id::new("lookup");
+        let language = egui::Id::new("language");
+        assert!(lookup_shortcuts_allowed(true, None, lookup));
+        assert!(lookup_shortcuts_allowed(true, Some(lookup), lookup));
+        assert!(!lookup_shortcuts_allowed(true, Some(language), lookup));
+        assert!(!lookup_shortcuts_allowed(false, None, lookup));
+        assert!(!lookup_shortcuts_allowed(false, Some(lookup), lookup));
+    }
 
     #[test]
     fn history_deduplicates_caps_and_navigates_without_guessing_sources() {
