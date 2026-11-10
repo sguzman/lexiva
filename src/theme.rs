@@ -3,6 +3,12 @@
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::mpsc::Receiver;
+
+#[cfg(target_os = "linux")]
+use std::io::{BufRead, BufReader, Write};
+#[cfg(target_os = "linux")]
+use std::os::unix::net::UnixStream;
 
 use eframe::egui;
 
@@ -42,6 +48,14 @@ impl ThemeChoice {
         }
     }
 
+    fn from_darkman_message(value: &str) -> Option<Self> {
+        match value.trim() {
+            "light" => Some(Self::Light),
+            "dark" => Some(Self::Dark),
+            _ => None,
+        }
+    }
+
     pub fn apply(self, ctx: &egui::Context) {
         let pref = match self {
             Self::System => egui::ThemePreference::System,
@@ -49,6 +63,57 @@ impl ThemeChoice {
             Self::Dark => egui::ThemePreference::Dark,
         };
         ctx.set_theme(pref);
+    }
+}
+
+/// A Linux Darkman subscription: one socket, initial state and event-driven
+/// changes, without a timer, DBus dependency or repeated process launches.
+/// Missing Darkman falls through to eframe's regular System preference.
+pub struct DarkmanWatcher {
+    updates: Receiver<ThemeChoice>,
+}
+
+impl DarkmanWatcher {
+    pub fn spawn(ctx: &egui::Context) -> Option<Self> {
+        #[cfg(target_os = "linux")]
+        {
+            let runtime = std::env::var_os("XDG_RUNTIME_DIR")?;
+            let path = std::path::PathBuf::from(runtime).join("darkman/control.sock");
+            let mut stream = UnixStream::connect(path).ok()?;
+            stream.write_all(b"watch\\n").ok()?;
+            let (send, updates) = std::sync::mpsc::channel();
+            let ctx = ctx.clone();
+            std::thread::Builder::new()
+                .name("lexiva-darkman".into())
+                .spawn(move || {
+                    for line in BufReader::new(stream).lines() {
+                        let Ok(line) = line else { break };
+                        let Some(mode) = ThemeChoice::from_darkman_message(&line) else {
+                            continue;
+                        };
+                        if send.send(mode).is_err() {
+                            break;
+                        }
+                        ctx.request_repaint();
+                    }
+                })
+                .ok()?;
+            Some(Self { updates })
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = ctx;
+            None
+        }
+    }
+
+    /// Coalesce quick manual mode toggles; only the newest one is visible.
+    pub fn latest(&self) -> Option<ThemeChoice> {
+        let mut latest = None;
+        while let Ok(mode) = self.updates.try_recv() {
+            latest = Some(mode);
+        }
+        latest
     }
 }
 
@@ -123,6 +188,15 @@ pub fn configure_palette(ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::{ThemeChoice, reader_scale_from_storage};
+
+    #[test]
+    fn darkman_notifications_accept_only_explicit_modes() {
+        assert_eq!(ThemeChoice::from_darkman_message("light\\n"), Some(ThemeChoice::Light));
+        assert_eq!(ThemeChoice::from_darkman_message("dark"), Some(ThemeChoice::Dark));
+        for input in ["", "toggle", "system", "red", "unknown"] {
+            assert_eq!(ThemeChoice::from_darkman_message(input), None);
+        }
+    }
 
     #[test]
     fn persistent_values_round_trip() {

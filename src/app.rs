@@ -78,6 +78,8 @@ impl SearchHistory {
 
 pub struct LexivaApp {
     theme: ThemeChoice,
+    darkman_watcher: Option<theme::DarkmanWatcher>,
+    last_system_theme: Option<ThemeChoice>,
     reader_scale: f32,
     query: String,
     headword_language: String,
@@ -123,6 +125,7 @@ impl LexivaApp {
             .and_then(|value| ThemeChoice::from_storage_value(&value))
             .unwrap_or_default();
         theme.apply(&cc.egui_ctx);
+        let darkman_watcher = theme::DarkmanWatcher::spawn(&cc.egui_ctx);
 
         let (worker, manager, error) = match search_worker::catalog_path() {
             Ok(path) => {
@@ -152,6 +155,8 @@ impl LexivaApp {
         };
         let mut app = Self {
             theme,
+            darkman_watcher,
+            last_system_theme: None,
             reader_scale,
             query: String::new(),
             headword_language,
@@ -269,6 +274,12 @@ impl LexivaApp {
 
 impl eframe::App for LexivaApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if let Some(mode) = self.darkman_watcher.as_ref().and_then(theme::DarkmanWatcher::latest) {
+            self.last_system_theme = Some(mode);
+            if self.theme == ThemeChoice::System {
+                mode.apply(ui.ctx());
+            }
+        }
         self.receive_updates();
         let changed = self.manager.as_mut().and_then(SourceManager::poll);
         if let Some(change) = changed {
@@ -309,6 +320,11 @@ impl eframe::App for LexivaApp {
                     });
                 if self.theme != previous {
                     self.theme.apply(ui.ctx());
+                    if self.theme == ThemeChoice::System
+                        && let Some(mode) = self.last_system_theme
+                    {
+                        mode.apply(ui.ctx());
+                    }
                 }
                 ui.label("Appearance");
             });
