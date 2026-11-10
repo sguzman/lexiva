@@ -14,7 +14,7 @@ pub const SCHEMA_VERSION: i64 = 3;
 mod import;
 mod search;
 
-pub use search::{SearchFilters, SearchHit};
+pub use search::{SearchFilters, SearchHit, SourceSettings};
 
 #[cfg(test)]
 mod migration_tests;

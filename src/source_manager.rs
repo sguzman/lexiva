@@ -83,7 +83,10 @@ impl SourceHealth {
 fn file_signature(path: &Path) -> io::Result<String> {
     let mut file = File::open(path)?;
     let info = file.metadata()?;
-    let modified = info.modified()?.duration_since(UNIX_EPOCH).unwrap_or_default();
+    let modified = info
+        .modified()?
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     let mut hash = 0xcbf29ce484222325_u64;
     for position in [0, info.len().saturating_sub(8192)] {
         file.seek(SeekFrom::Start(position))?;
@@ -94,7 +97,11 @@ fn file_signature(path: &Path) -> io::Result<String> {
             hash = hash.wrapping_mul(0x100000001b3);
         }
     }
-    Ok(format!("{}:{}:{hash:016x}", info.len(), modified.as_nanos()))
+    Ok(format!(
+        "{}:{}:{hash:016x}",
+        info.len(),
+        modified.as_nanos()
+    ))
 }
 
 fn source_signature(source: &DictionarySource) -> io::Result<String> {
@@ -137,7 +144,9 @@ fn record_signature(
         source.metadata = json!({});
     }
     source.metadata["import_signature"] = json!(signature);
-    store.upsert_source(&source).map_err(|error| error.to_string())
+    store
+        .upsert_source(&source)
+        .map_err(|error| error.to_string())
 }
 
 enum Event {
@@ -391,13 +400,8 @@ impl SourceManager {
                             let _ = outgoing.send(Event::Checked);
                             Ok(None)
                         },
-                        Command::Reindex(id) => reindex(
-                            &mut store,
-                            &id,
-                            &worker_cancel,
-                            &outgoing,
-                        )
-                        .map(|count| Some((id, count))),
+                        Command::Reindex(id) => reindex(&mut store, &id, &worker_cancel, &outgoing)
+                            .map(|count| Some((id, count))),
                         Command::Scan(path) => match scan(&store, path.as_deref()) {
                             Ok(found) => {
                                 let _ = outgoing.send(Event::Found(found));
