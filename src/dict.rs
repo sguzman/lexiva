@@ -190,13 +190,16 @@ impl DictReader {
             }
             let text = std::str::from_utf8(&line)
                 .map_err(|_| invalid("DICT index headword is not UTF-8"))?;
-            let row = parse_row(text).map_err(|error| {
-                invalid(format!("DICT index line {}: {error}", self.line_no))
-            })?;
+            let row = parse_row(text)
+                .map_err(|error| invalid(format!("DICT index line {}: {error}", self.line_no)))?;
             if row.length > MAX_ARTICLE_BYTES {
                 return Err(invalid("DICT article exceeds size limit"));
             }
-            if row.start.checked_add(row.length).is_none_or(|end| end > self.data_len) {
+            if row
+                .start
+                .checked_add(row.length)
+                .is_none_or(|end| end > self.data_len)
+            {
                 return Err(invalid(format!(
                     "DICT index line {} points past data file",
                     self.line_no
@@ -209,8 +212,8 @@ impl DictReader {
             self.data.seek(SeekFrom::Start(row.start))?;
             let mut bytes = vec![0; row.length as usize];
             self.data.read_exact(&mut bytes)?;
-            let article = String::from_utf8(bytes)
-                .map_err(|_| invalid("DICT article is not UTF-8"))?;
+            let article =
+                String::from_utf8(bytes).map_err(|_| invalid("DICT article is not UTF-8"))?;
             return Ok(Some(LexicalEntry {
                 source_id: self.source_id.clone(),
                 source_entry_id: format!("index-line:{}", self.line_no),
@@ -276,7 +279,8 @@ mod tests {
     impl FixtureDir {
         fn new() -> Self {
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!("lexiva-dict-{}-{id}", std::process::id()));
+            let path =
+                std::env::temp_dir().join(format!("lexiva-dict-{}-{id}", std::process::id()));
             fs::create_dir(&path).unwrap();
             Self(path)
         }
@@ -446,14 +450,15 @@ mod tests {
             metadata: Value::Null,
         };
         db.replace_source_entries("es-en", &[original]).unwrap();
-        assert!(db
-            .import_stream(
+        assert!(
+            db.import_stream(
                 "es-en",
                 DictReader::open(&source(), &files).unwrap(),
                 || false,
                 |_| {},
             )
-            .is_err());
+            .is_err()
+        );
         assert_eq!(db.count_entries("es-en").unwrap(), 1);
         assert_eq!(db.search_prefix("old", Some("es-en"), 10).unwrap().len(), 1);
 
