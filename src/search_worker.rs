@@ -252,6 +252,82 @@ mod tests {
     }
 
     #[test]
+    fn worker_keeps_latest_query_and_source_identity() {
+        use std::time::{Duration, Instant};
+
+        use serde_json::Value;
+
+        use crate::model::{DictionarySource, LexicalEntry, Sense, SourceFormat};
+
+        let path = std::env::temp_dir().join(format!(
+            "lexiva-search-worker-{}.sqlite",
+            std::process::id()
+        ));
+        let mut store = DictionaryStore::open(&path).unwrap();
+        let source = DictionarySource {
+            id: "test".to_owned(),
+            title: "Test dictionary".to_owned(),
+            format: SourceFormat::Dict,
+            origin: None,
+            headword_language: Some("es".to_owned()),
+            definition_language: Some("en".to_owned()),
+            license: None,
+            attribution: None,
+            metadata: Value::Null,
+        };
+        store.upsert_source(&source).unwrap();
+        store
+            .replace_source_entries(
+                "test",
+                &[LexicalEntry {
+                    source_id: "test".to_owned(),
+                    source_entry_id: "1".to_owned(),
+                    lemma: "casa".to_owned(),
+                    headword_language: Some("es".to_owned()),
+                    definition_language: Some("en".to_owned()),
+                    part_of_speech: Some("noun".to_owned()),
+                    senses: vec![Sense {
+                        number: None,
+                        definition_language: Some("en".to_owned()),
+                        glosses: vec!["home".to_owned()],
+                        labels: vec![],
+                        examples: vec![],
+                        children: vec![],
+                    }],
+                    pronunciations: vec![],
+                    etymologies: vec![],
+                    forms: vec![],
+                    relations: vec![],
+                    metadata: Value::Null,
+                }],
+            )
+            .unwrap();
+        drop(store);
+
+        let context = egui::Context::default();
+        let worker = SearchWorker::spawn(path.clone(), &context).unwrap();
+        let scope = SearchScope::Source("test".to_owned());
+        worker.submit(1, "missing", &scope).unwrap();
+        worker.submit(2, "cas", &scope).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let update = loop {
+            if let Some(update) = worker.poll()
+                && update.serial == 2
+            {
+                break update;
+            }
+            assert!(Instant::now() < deadline, "search worker did not reply");
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        assert_eq!(update.hits.len(), 1);
+        assert_eq!(update.hits[0].entry.lemma, "casa");
+        assert_eq!(update.hits[0].source.id, "test");
+        assert!(update.error.is_none());
+        drop(worker);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn unselected_scope_never_means_search_every_source() {
         assert_eq!(SearchScope::default(), SearchScope::Unselected);
         assert_eq!(SearchScope::Unselected.label(&[]), "Choose a dictionary");
