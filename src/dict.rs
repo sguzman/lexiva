@@ -1,8 +1,8 @@
-//! Read-only GNU DICT discovery and uncompressed .dict index reader.
+//! Read-only GNU DICT .index reader for plain and dictzip data.
 //!
 //! A .index line is: headword TAB base64(offset) TAB base64(length) LF.
-//! Offsets and lengths refer to **bytes** in the uncompressed .dict file.
-//! Compressed dictzip (.dict.dz) requires a separate random-access decoder.
+//! Offsets and lengths refer to bytes in the *uncompressed* .dict data.
+mod dictzip;
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -131,13 +131,38 @@ fn parse_row(line: &str) -> io::Result<IndexRow<'_>> {
     })
 }
 
+enum DictBody {
+    Plain { file: File, len: u64 },
+    Zipped(dictzip::DictzipReader),
+}
+
+impl DictBody {
+    fn len(&self) -> u64 {
+        match self {
+            Self::Plain { len, .. } => *len,
+            Self::Zipped(reader) => reader.len(),
+        }
+    }
+
+    fn read_at(&mut self, start: u64, length: u64) -> io::Result<Vec<u8>> {
+        match self {
+            Self::Plain { file, .. } => {
+                file.seek(SeekFrom::Start(start))?;
+                let mut result = vec![0u8; length as usize];
+                file.read_exact(&mut result)?;
+                Ok(result)
+            }
+            Self::Zipped(reader) => reader.read_at(start, length),
+        }
+    }
+}
+
 pub struct DictReader {
     source_id: String,
     headword_language: Option<String>,
     definition_language: Option<String>,
     index: BufReader<File>,
-    data: File,
-    data_len: u64,
+    data: DictBody,
     line_no: u64,
     finished: bool,
 }
@@ -147,21 +172,19 @@ impl DictReader {
         source
             .validate()
             .map_err(|reason| invalid(format!("invalid dictionary source: {reason}")))?;
-        if files.compressed {
-            return Err(io::Error::new(
-                io::ErrorKind::Unsupported,
-                "dictzip .dict.dz reading is not implemented yet",
-            ));
-        }
-        let data = File::open(&files.data)?;
-        let data_len = data.metadata()?.len();
+        let file = File::open(&files.data)?;
+        let data = if files.compressed {
+            DictBody::Zipped(dictzip::DictzipReader::open(file)?)
+        } else {
+            let len = file.metadata()?.len();
+            DictBody::Plain { file, len }
+        };
         Ok(Self {
             source_id: source.id.clone(),
             headword_language: source.headword_language.clone(),
             definition_language: source.definition_language.clone(),
             index: BufReader::new(File::open(&files.index)?),
             data,
-            data_len,
             line_no: 0,
             finished: false,
         })
@@ -198,7 +221,7 @@ impl DictReader {
             if row
                 .start
                 .checked_add(row.length)
-                .is_none_or(|end| end > self.data_len)
+                .is_none_or(|end| end > self.data.len())
             {
                 return Err(invalid(format!(
                     "DICT index line {} points past data file",
@@ -209,9 +232,7 @@ impl DictReader {
             if row.lemma.starts_with("00-database-") {
                 continue;
             }
-            self.data.seek(SeekFrom::Start(row.start))?;
-            let mut bytes = vec![0; row.length as usize];
-            self.data.read_exact(&mut bytes)?;
+            let bytes = self.data.read_at(row.start, row.length)?;
             let article =
                 String::from_utf8(bytes).map_err(|_| invalid("DICT article is not UTF-8"))?;
             return Ok(Some(LexicalEntry {
@@ -356,10 +377,7 @@ mod tests {
         assert_eq!(discovered.len(), 2);
         assert_eq!(discovered[0], plain);
         assert!(discovered[1].compressed);
-        assert!(matches!(
-            DictReader::open(&source(), &discovered[1]),
-            Err(error) if error.kind() == io::ErrorKind::Unsupported
-        ));
+        assert!(DictReader::open(&source(), &discovered[1]).is_err());
     }
 
     #[test]
@@ -466,6 +484,62 @@ mod tests {
         let huge_files = fixture.pair("huge", &huge, b"x");
         let mut reader = DictReader::open(&source(), &huge_files).unwrap();
         assert!(reader.next().unwrap().is_err());
+    }
+
+    #[test]
+    fn compressed_dictzip_import_uses_uncompressed_index_positions() {
+        let fixture = FixtureDir::new();
+        let raw = b"house; home\nblue sky\nneedle\n\xc3\xa1rbol: tree\n";
+        let sample = include_bytes!("../tests/fixtures/synthetic.dict.dz");
+        let index = format!(
+            "casa\tA\t{}\nazul\t{}\t{}\npunta\t{}\t{}\narbol\t{}\t{}\n",
+            encode(12),
+            encode(12),
+            encode(9),
+            encode(21),
+            encode(7),
+            encode(28),
+            encode(13)
+        );
+        let index_path = fixture.0.join("compressed.index");
+        let data_path = fixture.0.join("compressed.dict.dz");
+        fs::write(&index_path, index).unwrap();
+        fs::write(&data_path, sample).unwrap();
+        let files = DictFiles {
+            index: index_path,
+            data: data_path,
+            compressed: true,
+        };
+        let mut reader = DictReader::open(&source(), &files).unwrap();
+        let first = reader.next().unwrap().unwrap();
+        let second = reader.next().unwrap().unwrap();
+        assert_eq!(first.senses[0].glosses[0], "house; home\n");
+        assert_eq!(second.senses[0].glosses[0], "blue sky\n");
+        let rest: Vec<_> = reader.collect::<StoreResult<Vec<_>>>().unwrap();
+        assert_eq!(rest[1].senses[0].glosses[0], "árbol: tree\n");
+        assert_eq!(raw.len(), 41);
+
+        let mut store = DictionaryStore::open(&fixture.0.join("dictzip.sqlite")).unwrap();
+        store.upsert_source(&source()).unwrap();
+        let imported = store
+            .import_stream(
+                "es-en",
+                DictReader::open(
+                    &source(),
+                    &DictFiles {
+                        index: files.index.clone(),
+                        data: files.data.clone(),
+                        compressed: true,
+                    },
+                )
+                .unwrap(),
+                || false,
+                |_| {},
+            )
+            .unwrap();
+        assert_eq!(imported, 4);
+        assert_eq!(store.search_prefix("cas", Some("es-en"), 10).unwrap().len(), 1);
+        store.check_fts_index().unwrap();
     }
 
     #[test]
