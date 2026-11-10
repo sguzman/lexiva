@@ -2,7 +2,7 @@
 
 **Lexiva** is a native, offline-first dictionary reader for Linux built with Rust and [egui/eframe](https://github.com/emilk/egui). It aims to make installed Arch dictionaries and open lexical datasets readable in a fast, elegant interface.
 
-> **Status: native search/reader and query worker complete to CI scope; GUI dictionary provisioning next.** The egui interface supports source-attributed results, ordered definitions, bounded spelling suggestions, keyboard search/history/copy and interruptible searches over an existing indexed SQLite catalog. **Fresh-install GUI source indexing, native Hyprland runtime QA, StarDict/TEI support and full-dump acceptance remain unfinished.**
+> **Status: native search/reader plus first-use dictionary import controls implemented and CI-tested.** Lexiva can explicitly scan local DICT files, import/reindex a selected dictionary, import a local Wiktextract JSONL/gzip file, remove only its local index, and filter word and definition languages independently. **Native Hyprland GUI QA, persistent source enable/priority, package-change rescans, StarDict/TEI and whole-dump acceptance remain unfinished.**
 
 ## Planned features
 
@@ -14,7 +14,7 @@
 
 ## Developer build
 
-The source builds against Rust 1.95.0. The native egui shell now searches and reads existing entries in its XDG SQLite catalog, but first-use discovery/import controls are not ready. The launch path has **not yet been verified on the target Hyprland desktop**. The repository's existing CI cannot substitute for native UI QA, and release installation instructions will follow that acceptance. Follow the workstation's established `mbx` coordination for local Cargo builds and use `cargo install --path` when installation is authorized.
+The source builds against Rust 1.95.0. The native egui shell has explicit first-use DICT and Wiktextract source import controls, wired to its XDG SQLite catalog. These are CI-tested but not verified through an actual Hyprland GUI session. The launch path has **not yet been verified on the target Hyprland desktop**. The repository's existing CI cannot substitute for native UI QA, and release installation instructions will follow that acceptance. Follow the workstation's established `mbx` coordination for local Cargo builds and use `cargo install --path` when installation is authorized.
 
 ## Project documentation
 
@@ -27,6 +27,7 @@ The source builds against Rust 1.95.0. The native egui shell now searches and re
 - [GNU DICT adapter status and limits](docs/DICT.md)
 - [Wiktextract streaming, editions and limits](docs/WIKTEXTRACT.md)
 - [Indexed search and native reader state](docs/SEARCH.md)
+- [Source manager, import and removal contract](docs/SOURCES.md)
 - [Testing and release acceptance](docs/TESTING.md)
 
 ## Visual identity

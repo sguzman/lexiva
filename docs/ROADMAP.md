@@ -4,11 +4,11 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 
 ## Progress checkpoint
 
-- Verified: **60 / 100 weighted points (60%)**. Previous checkpoint: 52%; this development round **+8 percentage points**: LEX-050 (+3) bounded spelling suggestions/Unicode search; LEX-053 (+2) keyboard search, navigation, session history and copy; LEX-054 (+3) interruptible background SQLite queries and stale-response suppression. M05 complete at automated-test scope; Hyprland GUI acceptance remains pending.
-- Verified in [CI run 42864645742](https://github.com/sguzman/lexiva/actions/runs/42864645742): native egui compilation, formatting, strict Clippy, search suggestion/history tests, real FreeDict and M04 corpus/Kaikki regressions. [CI run 42865037021](https://github.com/sguzman/lexiva/actions/runs/42865037021) additionally tests latest-request-wins worker behavior. Automated checks do not prove an actual Hyprland window, shortcut interception, or latency on the owner's hardware.
+- Verified: **64 / 100 weighted points (64%)**. Previous checkpoint: 60%; this development round **+4 percentage points** for M06 LEX-060 (+2) explicit DICT scan/GUI import/reindex/remove/status and LEX-061 (+2) independent GUI word/definition language filters. Persistent source enabling/priority and package-change rescanning remain pending.
+- Verified in [CI run 42875563900](https://github.com/sguzman/lexiva/actions/runs/42875563900): format, native compilation, strict Clippy, explicit read-only DICT and local Wiktextract JSONL import tests, cancellation and removal of only derived SQLite records, independent word/definition language search wiring, real FreeDict and Kaikki raw samples and 150k-record regression. This still does not prove native Hyprland GUI interaction.
 - Baseline commit: b0cb884657a22b3cf2ec91fa15f4765b94c3a605 on main before inception documentation.
 - Environment limitation: tool execution container currently has no Rust toolchain; actual build requires GitHub CI and user-machine QA.
-- Next: M06 explicit GUI source discovery/import, independent headword/definition language selectors, persistent source enabling and package-change rescans. This is the missing first-run dictionary provisioning workflow; M01 LEX-011 native Hyprland launch smoke and performance/UX QA are still pending.
+- Next: M06 LEX-062 persistent source enable/disable and explicit priority; LEX-063 fingerprint-based package-change scan/reindex and missing-source handling. First-use import controls are coded and tested, but real Hyprland GUI smoke M01 LEX-011 and user experience/performance QA remain pending.
 
 ## Milestones
 
@@ -20,13 +20,13 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M03 📚 GNU DICT / Arch integration | 12 | 12 | verified complete |
 | M04 🌍 Wiktionary integration | 14 | 14 | verified complete |
 | M05 🔎 Search & reader | 13 | 13 | verified complete |
-| M06 🧰 Dictionary & language management | 8 | 0 | pending |
+| M06 🧰 Dictionary & language management | 8 | 4 | active |
 | M07 🌗 Appearance and accessibility | 8 | 0 | pending |
 | M08 🌟 StarDict & TEI | 10 | 0 | pending |
 | M09 🛡️ Hardening/performance | 6 | 0 | pending |
 | M10 📦 Documentation & distribution | 4 | 0 | pending |
 | M11 ✅ Acceptance & release | 3 | 0 | pending |
-| **Total** | **100** | **60** | **active** |
+| **Total** | **100** | **64** | **active** |
 
 ### M00 🧭 Inception & engineering contracts
 
@@ -104,8 +104,8 @@ Dependency: M03–M05; weight: 8 points.
 
 | ID | Deliverable | Weight | Objective exit evidence | Status |
 |---|---|---:|---|---|
-| LEX-060 🧭 | GUI source discovery, add/remove and status | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-061 🗺️ | Independent word and definition language selectors | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-060 🧭 | GUI source discovery, add/remove and status | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
+| LEX-061 🗺️ | Independent word and definition language selectors | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-062 🎚️ | Persistent source enabling and priority | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
 | LEX-063 🔃 | Rescan/reindex after package changes and missing files | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
 
@@ -214,3 +214,5 @@ Excluded: online server/account, telemetry, web/mobile app, automatic OS package
 - 2026-11-10: Implemented `DictionaryStore::search_ranked` with FTS5 exact-then-prefix lookup, Latin accent-insensitive candidate matching, stable homograph/source identity, bounded results, source/POS attribution and independent language filter parameters. Native `src/app.rs` now uses an explicit dictionary chooser and `src/search_worker.rs` for background SQLite queries and stale response rejection; unselected never means all. `src/reader.rs` renders ordered glosses/examples/IPA/forms/etymology/relations and copies source-attributed plain-text definitions, preserving trailing source line breaks (verified against real Ubuntu FreeDict data). CI [42861187298](https://github.com/sguzman/lexiva/actions/runs/42861187298) covers native compilation, search and copy tests plus existing corpus regressions. LEX-051/052 verified to test scope. LEX-050/053/054 remain pending because typo suggestions, search history and true in-flight cancellation are not complete; live Hyprland GUI still untested and source manager M06 still required to index files for first-use lookup.
 
 - 2026-11-10: Added `DictionaryStore::suggest_words` (FTS5-prefix candidate limit 512, constrained 1–2-edit Unicode/Latin-folded suggestions, 8 suggestion limit, language/source restrictions), egui suggestion actions, session-only 40-term deduplicated search history, Ctrl+L search focus, Alt+Up/Down history, result arrow selection and Ctrl+Enter copy. The worker has a rusqlite interrupt handle, generation-tagged queries, queued-request coalescing and drops obsolete cancellation errors. [CI 42864645742](https://github.com/sguzman/lexiva/actions/runs/42864645742) passed fmt/check/Clippy, search/history tests and real FreeDict plus Wiktextract regressions. [CI 42865037021](https://github.com/sguzman/lexiva/actions/runs/42865037021) added a file-backed worker test ensuring the latest source-scoped request wins. LEX-050/053/054 verified to CI scope; M05 complete. Native Hyprland keyboard/GUI and optimized search latency QA are not completed by these tests.
+
+- 2026-11-10: Added native `SourceManager` with explicitly requested DICT scan of `/usr/share/dictd`, `/usr/local/share/dictd` and optional entered directory; per-source index and metadata/status; a separate import worker for read-only DICT or explicitly selected Wiktextract `.jsonl`/`.jsonl.gz` (English/Spanish edition + optional headword filter); bounded staged progress, cancellation and atomic publication; and GUI local-index removal with cascade/FTS preservation but no source-file edits. Stable source IDs incorporate original path and, for JSONL, edition/filter. Added independent GUI word-language and definition-language text filters wired to source-aware background SQLite search. [CI 42875563900](https://github.com/sguzman/lexiva/actions/runs/42875563900) passed fmt/check/Clippy, source manager round-trip/import/cancel/remove tests and existing FreeDict/Wiktextract/large-corpus checks. LEX-060/061 verified to CI scope; no user-machine Hyprland GUI QA, persistent enabled-source priority, fingerprint-based reindex or automatic missing-file behavior yet.

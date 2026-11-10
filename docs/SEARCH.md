@@ -1,6 +1,6 @@
 # Lexiva indexed search and definition reader
 
-**Status:** Implemented native egui search/results/reader shell and tested SQLite ranked-search backend. This is **not yet a complete first-run dictionary application** because the GUI source manager/import action is still M06.
+**Status:** Native egui search/results/reader and explicit first-use DICT/JSONL source-import controls compile and pass CI. This is **not yet user-machine GUI-verified**; persistent source enabling/priority and package-change rescanning remain M06.
 
 ## User-visible flow
 
@@ -13,13 +13,13 @@
 
 ## Indexed query details
 
-`DictionaryStore::search_ranked` first queries FTS5 for exact quoted words and then for a quoted prefix, deduplicating by (source ID, entry ID). Literal exact spellings sort before longer prefixes. The FTS5 `unicode61 remove_diacritics 2` tokenizer supports accent-insensitive Latin word retrieval, while preserving the original lemma display. Optional source ID, headword-language and definition-language filters are implemented in the underlying SQLite search API. The GUI currently exposes only source selection; independent language UI controls are planned for M06. On a no-hit query, the backend can suggest Latin accent-folded candidate words using a bounded prefix-index query (at most 512 distinct candidate headwords), bounded Unicode edit distance and a maximum of 8 suggestions. This does not claim full language-agnostic fuzzy matching or exhaustive edit coverage for every spelling error.
+`DictionaryStore::search_ranked` first queries FTS5 for exact quoted words and then for a quoted prefix, deduplicating by (source ID, entry ID). Literal exact spellings sort before longer prefixes. The FTS5 `unicode61 remove_diacritics 2` tokenizer supports accent-insensitive Latin word retrieval, while preserving the original lemma display. Optional source ID, headword-language and definition-language filters are implemented in the underlying SQLite search API. The GUI now exposes separate optional `Word language` and `Definition language` inputs in addition to the source selector. `es` and `en` may be entered independently; blank means no restriction. The query worker passes all three filters to SQLite, including for spelling suggestions. On a no-hit query, the backend can suggest Latin accent-folded candidate words using a bounded prefix-index query (at most 512 distinct candidate headwords), bounded Unicode edit distance and a maximum of 8 suggestions. This does not claim full language-agnostic fuzzy matching or exhaustive edit coverage for every spelling error.
 
 Search results are bounded to 100 records in the backend and 60 in the native worker. The worker coalesces queued keystrokes, performs SQLite work off the egui/UI thread, and rejects stale serial-tagged updates. Each new request advances an atomic generation and can call SQLite's thread-safe interrupt handle to cancel an earlier in-flight query. The worker ignores obsolete replies and interruption errors associated with superseded generations. A dedicated file-backed test exercises the latest-result-wins behavior; true kernel-level scheduling latency and responsiveness under full-size dictionaries still require target hardware testing.
 
 ## Source ownership and limitations
 
-The catalog is derived local data. It must not be mistaken for a dictionary source file, and a brand-new catalog has no indexed dictionary content. The GUI does not yet import GNU DICT/FreeDict or Wiktextract files itself. Source discovery/import, enabled-source persistence, rescan and language selectors are M06. Existing native shell compilation and unit/regression tests do **not** establish runtime behavior on the owner's Arch/Hyprland machine (LEX-011 is pending).
+The catalog is derived local data. It must not be mistaken for a dictionary source file, and a brand-new catalog has no indexed dictionary content. The GUI now explicitly scans for read-only DICT file pairs and imports individually selected sources, with per-source indexed count and removal of the **derived index only**. It can also import an explicitly provided local Wiktextract JSONL/gzip file with an English or Spanish Wiktionary edition and optional word-language filter. It does not auto-import packages or run a server. Persistent enable/disable state, search priority, content-fingerprint rescans, and comprehensive missing-file handling are still M06 tasks. Existing native shell compilation and unit/regression tests do **not** establish runtime behavior on the owner's Arch/Hyprland machine (LEX-011 is pending).
 
 No dictionary content, fonts or non-MIT source licenses are implicitly shipped or granted.
 
@@ -28,3 +28,5 @@ No dictionary content, fonts or non-MIT source licenses are implicitly shipped o
 - [CI 42864645742](https://github.com/sguzman/lexiva/actions/runs/42864645742): formatting, native build, Clippy, spelling suggestion/edit-distance/keyboard history tests, real Ubuntu FreeDict integration, existing 150k-record and Kaikki regression suite.
 - [CI 42865037021](https://github.com/sguzman/lexiva/actions/runs/42865037021): file-backed worker verification of rapid superseded source-scoped queries returning the latest result.
 - [Storage contract](STORAGE.md), [FreeDict adapter](DICT.md), [Wiktextract adapter](WIKTEXTRACT.md) and [roadmap](ROADMAP.md).
+
+- [CI 42875563900](https://github.com/sguzman/lexiva/actions/runs/42875563900): source manager's test-indexed FreeDict-style DICT and synthetic Wiktextract JSONL round trip, cancel-without-loss, local-index removal, and two independent query-language selectors.
