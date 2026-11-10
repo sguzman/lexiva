@@ -45,7 +45,6 @@ fn ensure_entry_size(entry: &LexicalEntry) -> Result<()> {
     Ok(())
 }
 
-
 /// Owns a single dictionary's staging lease on a DictionaryStore connection.
 /// Dropping it cleans up normally; a process crash may leave staging rows,
 /// but they cannot affect live searches or be published implicitly.
