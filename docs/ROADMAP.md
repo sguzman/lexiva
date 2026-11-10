@@ -4,11 +4,11 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 
 ## Progress checkpoint
 
-- Verified: **18 / 100 weighted points (18%)**. Previous comparable checkpoint: 8%; this development round: **+10 percentage points**. M00 risk review +2; M02 model, SQLite/FTS, provenance +8. Source code and database tests passed; real dictionary import/GUI paths remain unverified.
-- Verified in [CI run 42746299152](https://github.com/sguzman/lexiva/actions/runs/42746299152): Rust 1.95.0 formatting, compilation, strict Clippy and **11/11 unit tests**, plus updated Cargo.lock at a4ea52d. Not verified: real dictionary import, native GUI launch, large streamed imports, Hyprland theme detection or performance.
+- Verified: **21 / 100 weighted points (21%)**. Previous comparable checkpoint: 18%; this development round: **+3 percentage points**. M02 staged streaming publication (LEX-023) +2 and versioned migration/cache recovery (LEX-024) +1. No new work is claimed for unrelated milestones.
+- Verified in [CI run 42751965002](https://github.com/sguzman/lexiva/actions/runs/42751965002): Rust 1.95.0 formatting, compilation, strict Clippy and **24/24 tests** (including file-backed interrupted staging, migration, FTS rebuild, cancellation and oversized-entry rejection). No real DICT/Wiktionary adapter, target Hyprland GUI validation or optimized performance benchmark has yet run.
 - Baseline commit: b0cb884657a22b3cf2ec91fa15f4765b94c3a605 on main before inception documentation.
 - Environment limitation: tool execution container currently has no Rust toolchain; actual build requires GitHub CI and user-machine QA.
-- Next: implement bounded staged streaming imports and atomic publication (LEX-023), followed by cache migration/recovery (LEX-024); the DICT importer can then be built on this foundation. Native GUI smoke/Hyprland verification (LEX-011) remains outstanding.
+- Next: M03 GNU DICT integration, beginning with read-only Arch/source path discovery (LEX-030), `.index` and `.dict` parsing (LEX-031), and synthetic+real FreeDict verification. Native GUI smoke/Hyprland verification (LEX-011) remains outstanding.
 
 ## Milestones
 
@@ -16,7 +16,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 |---|---:|---:|---|
 | M00 🧭 Inception & engineering contracts | 5 | 5 | verified complete |
 | M01 🦀 Rust bootstrap | 6 | 5 | active |
-| M02 🗃️ Lexical data & search foundation | 11 | 8 | active |
+| M02 🗃️ Lexical data & search foundation | 11 | 11 | verified complete |
 | M03 📚 GNU DICT / Arch integration | 12 | 0 | pending |
 | M04 🌍 Wiktionary integration | 14 | 0 | pending |
 | M05 🔎 Search & reader | 13 | 0 | pending |
@@ -26,7 +26,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M09 🛡️ Hardening/performance | 6 | 0 | pending |
 | M10 📦 Documentation & distribution | 4 | 0 | pending |
 | M11 ✅ Acceptance & release | 3 | 0 | pending |
-| **Total** | **100** | **18** | **active** |
+| **Total** | **100** | **21** | **active** |
 
 ### M00 🧭 Inception & engineering contracts
 
@@ -59,8 +59,8 @@ Dependency: M01; weight: 11 points.
 | LEX-020 🧬 | Typed entries, sense structure, POS, language, IPA and etymology | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-021 🗄️ | Versioned SQLite storage and source-aware FTS5 indexes | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-022 🪪 | Source provenance and preservation of ordered/lossy metadata | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
-| LEX-023 🔄 | Transactional staged imports and atomic index publication | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-024 🩹 | Migration, corruption detection and safe cache recovery | 1 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-023 🔄 | Transactional staged imports and atomic index publication | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
+| LEX-024 🩹 | Migration, corruption detection and safe cache recovery | 1 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 
 ### M03 📚 GNU DICT / Arch integration
 
@@ -198,3 +198,5 @@ Excluded: online server/account, telemetry, web/mobile app, automatic OS package
 - 2026-11-09: Commits `caab949` (native eframe shell + initial CI), `0850416` (fmt repair), `8900eda` (initial Cargo.lock); CI run [42743338343](https://github.com/sguzman/lexiva/actions/runs/42743338343) passed fmt, check, Clippy and 2 unit tests. LEX-010/012/013 verified. GUI launch not tested.
 
 - 2026-11-09 / 2026-11-10 UTC: Implemented `src/model.rs` (nested senses, language/provenance, metadata), `src/storage.rs` and `src/schema.sql` (SQLite v1 + FTS5 source-aware catalog). CI [42746299152](https://github.com/sguzman/lexiva/actions/runs/42746299152) passed fmt, check, Clippy and 11 tests (0 failures). Includes transactional batch rollback, homograph/source isolation, FTS replacement and future schema refusal; lockfile commit `a4ea52d`. LEX-020/021/022 verified; LEX-023/024 pending. Inception dependency/data license risks documented at [DEPENDENCIES](DEPENDENCIES.md) (LEX-004 verified).
+
+- 2026-11-09 / 2026-11-10 UTC: Schema v2 staging/atomic publication and v1→v2 migration were implemented and tested; [CI 42751965002](https://github.com/sguzman/lexiva/actions/runs/42751965002) passed 24 tests, fmt/check/strict Clippy. Cancellation, duplicate rejection, source isolation, 128-record batching, 4 MiB per-record safeguards, on-disk abandoned staging, non-destructive corruption refusal and FTS rebuild tested. LEX-023 and LEX-024 verified; M02 completed. No real dictionary importer or GUI runtime validated yet.

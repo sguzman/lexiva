@@ -14,6 +14,6 @@
 
 Revisit decisions only when dependencies or actual requirements make a change necessary; do not scaffold unused crates or features.
 
-## Implemented foundation (schema v1)
+## Implemented foundation (schema v2)
 
-`src/model.rs` contains source-aware lexical records preserving ordered nested senses, examples, languages and unrecognized structured metadata; `src/storage.rs` provides a bundled SQLite catalog, transactional finite-batch replacement and source-scoped FTS5 prefix lookup with update/delete triggers. See [STORAGE.md](STORAGE.md) for the schema contract and known limits; [DEPENDENCIES.md](DEPENDENCIES.md) records crate/data-license decisions. The backend is not connected to UI; large staged streaming imports, migrations and crash recovery are not yet implemented.
+`src/model.rs` preserves source-aware lexical structure. `src/storage.rs` provides source-scoped SQLite/FTS5 index access; `src/storage/import.rs` implements bounded staged imports and single-transaction publication, and `src/migration_v1_to_v2.sql` handles existing v1 catalogs. Abandoned stage rows require explicit discard; a live full-text index can be rebuilt non-destructively. See [STORAGE.md](STORAGE.md) for validated behavior and limits, and [DEPENDENCIES.md](DEPENDENCIES.md) for crate/data-license decisions. Real dictionary adapters and GUI integration are still pending.
