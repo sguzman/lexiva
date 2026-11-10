@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write # temporary: commit generated Cargo.lock after successful validation
 
 jobs:
   validate:
@@ -22,8 +22,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev
-      - name: Generate initial application lockfile
-        run: cargo generate-lockfile
+      - name: Resolve initial application lockfile
+        run: |
+          if [ ! -f Cargo.lock ]; then cargo generate-lockfile; fi
       - name: Formatting
         run: cargo fmt --all -- --check
       - name: Compile all targets
@@ -39,3 +40,13 @@ jobs:
           name: lexiva-cargo-lock
           path: Cargo.lock
           if-no-files-found: warn
+      - name: Track resolved Cargo.lock only after tests succeed
+        if: success() && github.event_name == 'push'
+        run: |
+          if [ -n "$(git status --porcelain -- Cargo.lock)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Cargo.lock
+            git commit -m "chore: track initial Cargo dependency lockfile"
+            git push origin HEAD:main
+          fi

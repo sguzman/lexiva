@@ -69,7 +69,10 @@ mod tests {
     #[test]
     fn persistent_values_round_trip() {
         for mode in ThemeChoice::ALL {
-            assert_eq!(ThemeChoice::from_storage_value(mode.storage_value()), Some(mode));
+            assert_eq!(
+                ThemeChoice::from_storage_value(mode.storage_value()),
+                Some(mode)
+            );
         }
     }
 
