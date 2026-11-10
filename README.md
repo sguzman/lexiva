@@ -2,7 +2,7 @@
 
 **Lexiva** is a native, offline-first dictionary reader for Linux built with Rust and [egui/eframe](https://github.com/emilk/egui). It aims to make installed Arch dictionaries and open lexical datasets readable in a fast, elegant interface.
 
-> **Status: offline lexical backend verified for FreeDict and scoped Wiktextract workloads.** Real FreeDict packages passed cross-checks; Wiktextract JSONL/gzip passes both English/Spanish-edition authentic per-word records and a measured 150,000-record stress run with cancellation/reimport. Complete multi-gigabyte dumps, GUI search/reader integration and native Hyprland QA are **not yet complete**.
+> **Status: native search/reader wired to the verified dictionary index, with source setup still pending.** The egui search interface now displays attributed source results and ordered definitions from a pre-indexed SQLite catalog; the FreeDict reader/copy path and Wiktextract importer are covered in CI. **Fresh-install source indexing, typo suggestions, full keyboard/history, Hyprland runtime QA and multi-gigabyte dump acceptance are not yet complete.**
 
 ## Planned features
 
@@ -14,7 +14,7 @@
 
 ## Developer build
 
-The source builds against Rust 1.95.0. To inspect the early native shell from a checked-out repository, run `cargo run --locked`. This launch path is **not yet tested on the target desktop** and the application does not currently return definitions. Release installation instructions will follow actual on-device acceptance.
+The source builds against Rust 1.95.0. The native egui shell now searches and reads existing entries in its XDG SQLite catalog, but first-use discovery/import controls are not ready. The launch path has **not yet been verified on the target Hyprland desktop**. The repository's existing CI cannot substitute for native UI QA, and release installation instructions will follow that acceptance. Follow the workstation's established `mbx` coordination for local Cargo builds and use `cargo install --path` when installation is authorized.
 
 ## Project documentation
 
@@ -26,6 +26,7 @@ The source builds against Rust 1.95.0. To inspect the early native shell from a 
 - [Source formats](docs/FORMATS.md)
 - [GNU DICT adapter status and limits](docs/DICT.md)
 - [Wiktextract streaming, editions and limits](docs/WIKTEXTRACT.md)
+- [Indexed search and native reader state](docs/SEARCH.md)
 - [Testing and release acceptance](docs/TESTING.md)
 
 ## Visual identity
