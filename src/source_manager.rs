@@ -145,6 +145,7 @@ enum Event {
     Catalog(Vec<IndexedSource>),
     Removed(String),
     Preferences(String),
+    Checked,
     Progress(usize),
     Imported { source_id: String, count: usize },
     Error(String),
@@ -386,7 +387,10 @@ impl SourceManager {
                 }
                 while let Ok(command) = incoming.recv() {
                     let result = match command {
-                        Command::Refresh => Ok(None),
+                        Command::Refresh => {
+                            let _ = outgoing.send(Event::Checked);
+                            Ok(None)
+                        },
                         Command::Reindex(id) => reindex(
                             &mut store,
                             &id,
@@ -497,6 +501,10 @@ impl SourceManager {
         let mut changed = None;
         while let Ok(event) = self.events.try_recv() {
             match event {
+                Event::Checked => {
+                    self.busy = false;
+                    self.status = "Source files checked. Indexed entries are preserved.".into();
+                }
                 Event::Catalog(indexed) => {
                     self.indexed = indexed;
                 }
@@ -807,6 +815,30 @@ mod tests {
         assert!(import_dict(&mut store, &candidate, &cancel, &tx).is_err());
         assert_eq!(store.count_entries(&id).unwrap(), 1);
         assert_eq!(store.staged_count(&id).unwrap(), 0);
+
+        // Same-size edits are caught by sampled content fingerprints,
+        // even if a package preserves the compressed file size.
+        cancel.store(false, Ordering::Release);
+        let indexed_source = store.get_source(&id).unwrap().unwrap();
+        assert_eq!(source_health(&indexed_source), SourceHealth::UpToDate);
+        fs::write(&data_path, b"nest\n").unwrap();
+        assert_eq!(source_health(&indexed_source), SourceHealth::Changed);
+        assert_eq!(reindex(&mut store, &id, &cancel, &tx).unwrap(), 1);
+        let updated = store.get_entry(&id, "index-line:1").unwrap().unwrap();
+        assert_eq!(updated.senses[0].glosses[0], "nest\n");
+        assert_eq!(
+            source_health(&store.get_source(&id).unwrap().unwrap()),
+            SourceHealth::UpToDate
+        );
+        fs::remove_file(&data_path).unwrap();
+        assert_eq!(
+            source_health(&store.get_source(&id).unwrap().unwrap()),
+            SourceHealth::Missing
+        );
+        assert_eq!(store.count_entries(&id).unwrap(), 1);
+        assert!(reindex(&mut store, &id, &cancel, &tx).is_err());
+        assert_eq!(store.count_entries(&id).unwrap(), 1);
+        fs::write(&data_path, original_data).unwrap();
 
         cancel.store(false, Ordering::Release);
         assert!(store.remove_source(&id).unwrap());
