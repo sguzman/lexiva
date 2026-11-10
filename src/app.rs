@@ -31,6 +31,46 @@ impl EntryKey {
     }
 }
 
+#[derive(Default)]
+struct SearchHistory {
+    queries: Vec<String>,
+    cursor: Option<usize>,
+}
+
+impl SearchHistory {
+    fn remember(&mut self, query: &str) {
+        let query = query.trim();
+        if query.is_empty() {
+            return;
+        }
+        self.queries.retain(|previous| previous != query);
+        self.queries.push(query.to_owned());
+        if self.queries.len() > 40 {
+            self.queries.remove(0);
+        }
+        self.cursor = None;
+    }
+
+    fn previous(&mut self) -> Option<&str> {
+        let index = match self.cursor {
+            Some(index) => index.saturating_sub(1),
+            None => self.queries.len().checked_sub(1)?,
+        };
+        self.cursor = Some(index);
+        self.queries.get(index).map(String::as_str)
+    }
+
+    fn next(&mut self) -> Option<&str> {
+        let index = self.cursor?;
+        if index + 1 >= self.queries.len() {
+            self.cursor = None;
+            return None;
+        }
+        self.cursor = Some(index + 1);
+        self.queries.get(index + 1).map(String::as_str)
+    }
+}
+
 pub struct LexivaApp {
     theme: ThemeChoice,
     query: String,
@@ -40,6 +80,8 @@ pub struct LexivaApp {
     pending: bool,
     sources: Vec<DictionarySource>,
     hits: Vec<SearchHit>,
+    suggestions: Vec<String>,
+    history: SearchHistory,
     selected: Option<EntryKey>,
     error: Option<String>,
 }
@@ -73,6 +115,8 @@ impl LexivaApp {
             pending: false,
             sources: Vec::new(),
             hits: Vec::new(),
+            suggestions: Vec::new(),
+            history: SearchHistory::default(),
             selected: None,
             error,
         };
@@ -83,6 +127,7 @@ impl LexivaApp {
     fn dispatch_search(&mut self) {
         self.serial += 1;
         self.hits.clear();
+        self.suggestions.clear();
         self.selected = None;
         if let Some(worker) = &self.worker {
             match worker.submit(self.serial, &self.query, &self.scope) {
@@ -109,6 +154,7 @@ impl LexivaApp {
             self.pending = false;
             self.sources = update.sources;
             self.hits = update.hits;
+            self.suggestions = update.suggestions;
             self.error = update.error;
             if !self
                 .selected
@@ -223,10 +269,57 @@ impl eframe::App for LexivaApp {
         if response.changed() {
             self.dispatch_search();
         }
-        if ui.input(|input| input.key_pressed(egui::Key::ArrowDown)) {
+        let focus_search = ui.input(|input| {
+            input.modifiers.ctrl && input.key_pressed(egui::Key::L)
+        });
+        if focus_search {
+            response.request_focus();
+        }
+        let submitted = ui.input(|input| {
+            input.key_pressed(egui::Key::Enter) && !input.modifiers.ctrl
+        });
+        if submitted && response.has_focus() {
+            self.history.remember(&self.query);
+        }
+        let copy_shortcut = ui.input(|input| {
+            input.modifiers.ctrl && input.key_pressed(egui::Key::Enter)
+        });
+        if copy_shortcut {
+            if let Some(hit) = self.selected.as_ref().and_then(|selected| {
+                self.hits.iter().find(|hit| selected.matches(hit))
+            }) {
+                ui.ctx().copy_text(reader::copy_text(hit));
+            }
+        }
+
+        // History is intentionally session-only for now. Ctrl+L focuses
+        // lookup, Alt+Up/Down traverses submitted terms, ordinary arrows
+        // select search results, and Ctrl+Enter copies the selected result.
+        let history_up = ui.input(|input| {
+            input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp)
+        });
+        let history_down = ui.input(|input| {
+            input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown)
+        });
+        let recalled = if history_up {
+            self.history.previous().map(str::to_owned)
+        } else if history_down {
+            self.history.next().map(str::to_owned)
+        } else {
+            None
+        };
+        if let Some(query) = recalled {
+            self.query = query;
+            self.dispatch_search();
+        }
+        if ui.input(|input| {
+            !input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown)
+        }) {
             self.move_selection(1);
         }
-        if ui.input(|input| input.key_pressed(egui::Key::ArrowUp)) {
+        if ui.input(|input| {
+            !input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp)
+        }) {
             self.move_selection(-1);
         }
         ui.add_space(5.0);
@@ -243,6 +336,25 @@ impl eframe::App for LexivaApp {
 
         if self.hits.is_empty() {
             self.render_empty(ui);
+            if !self.suggestions.is_empty() {
+                ui.add_space(12.0);
+                ui.vertical_centered(|ui| {
+                    ui.strong("Did you mean…");
+                });
+                let mut chosen = None;
+                ui.horizontal_wrapped(|ui| {
+                    for word in &self.suggestions {
+                        if ui.button(word).clicked() {
+                            chosen = Some(word.clone());
+                        }
+                    }
+                });
+                if let Some(word) = chosen {
+                    self.history.remember(&word);
+                    self.query = word;
+                    self.dispatch_search();
+                }
+            }
             return;
         }
 
@@ -301,6 +413,26 @@ impl eframe::App for LexivaApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn history_deduplicates_caps_and_navigates_without_guessing_sources() {
+        let mut history = SearchHistory::default();
+        assert_eq!(history.previous(), None);
+        history.remember("  casa  ");
+        history.remember("árbol");
+        history.remember("casa");
+        assert_eq!(history.queries, ["árbol", "casa"]);
+        assert_eq!(history.previous(), Some("casa"));
+        assert_eq!(history.previous(), Some("árbol"));
+        assert_eq!(history.previous(), Some("árbol"));
+        assert_eq!(history.next(), Some("casa"));
+        assert_eq!(history.next(), None);
+        for i in 0..50 {
+            history.remember(&format!("item{i}"));
+        }
+        assert_eq!(history.queries.len(), 40);
+        assert_eq!(history.queries.first().map(String::as_str), Some("item10"));
+    }
 
     #[test]
     fn selection_is_stable_by_source_and_entry_identity() {

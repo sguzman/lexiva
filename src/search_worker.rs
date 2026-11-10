@@ -4,7 +4,9 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use eframe::egui;
@@ -46,12 +48,16 @@ pub struct SearchUpdate {
     pub serial: u64,
     pub sources: Vec<DictionarySource>,
     pub hits: Vec<SearchHit>,
+    pub suggestions: Vec<String>,
     pub error: Option<String>,
 }
 
 pub struct SearchWorker {
     requests: Sender<SearchRequest>,
     replies: Receiver<SearchUpdate>,
+    latest_serial: Arc<AtomicU64>,
+    active_serial: Arc<AtomicU64>,
+    interrupt: Arc<Mutex<Option<rusqlite::InterruptHandle>>>,
 }
 
 impl SearchWorker {
@@ -59,11 +65,22 @@ impl SearchWorker {
         let (request_tx, request_rx) = mpsc::channel::<SearchRequest>();
         let (reply_tx, reply_rx) = mpsc::channel::<SearchUpdate>();
         let context = context.clone();
+        let latest_serial = Arc::new(AtomicU64::new(0));
+        let active_serial = Arc::new(AtomicU64::new(0));
+        let interrupt = Arc::new(Mutex::new(None::<rusqlite::InterruptHandle>));
+        let worker_latest = latest_serial.clone();
+        let worker_active = active_serial.clone();
+        let worker_interrupt = interrupt.clone();
 
         thread::Builder::new()
             .name("lexiva-search".to_owned())
             .spawn(move || {
                 let connection = DictionaryStore::open(&path);
+                if let Ok(store) = &connection {
+                    if let Ok(mut guard) = worker_interrupt.lock() {
+                        *guard = Some(store.interrupt_handle());
+                    }
+                }
                 while let Ok(mut request) = request_rx.recv() {
                     // Only the newest pending keystroke matters, but an
                     // already-running SQLite statement is bounded by its LIMIT.
@@ -71,7 +88,13 @@ impl SearchWorker {
                         request = newer;
                     }
 
-                    let (sources, hits, error) = match &connection {
+                    // Mark which query is executing so a newer user request
+                    // can interrupt SQLite from the egui thread.
+                    if worker_latest.load(Ordering::Acquire) != request.serial {
+                        continue;
+                    }
+                    worker_active.store(request.serial, Ordering::Release);
+                    let (sources, hits, suggestions, error) = match &connection {
                         Ok(store) => match store.list_sources() {
                             Ok(sources) => {
                                 let result = match &request.scope {
@@ -92,20 +115,53 @@ impl SearchWorker {
                                     ),
                                 };
                                 match result {
-                                    Ok(hits) => (sources, hits, None),
-                                    Err(error) => (sources, Vec::new(), Some(error.to_string())),
+                                    Ok(hits) => {
+                                        let suggestions = if hits.is_empty()
+                                            && !request.query.trim().is_empty()
+                                            && request.scope != SearchScope::Unselected
+                                        {
+                                            let filters = match &request.scope {
+                                                SearchScope::Source(id) => SearchFilters {
+                                                    source_id: Some(id),
+                                                    ..SearchFilters::default()
+                                                },
+                                                _ => SearchFilters::default(),
+                                            };
+                                            store.suggest_words(&request.query, filters, 5)
+                                        } else {
+                                            Ok(Vec::new())
+                                        };
+                                        match suggestions {
+                                            Ok(suggestions) => (sources, hits, suggestions, None),
+                                            Err(error) => (sources, hits, Vec::new(), Some(error.to_string())),
+                                        }
+                                    }
+                                    Err(error) => {
+                                        (sources, Vec::new(), Vec::new(), Some(error.to_string()))
+                                    }
                                 }
                             }
-                            Err(error) => (Vec::new(), Vec::new(), Some(error.to_string())),
+                            Err(error) => {
+                                (Vec::new(), Vec::new(), Vec::new(), Some(error.to_string()))
+                            }
                         },
-                        Err(error) => (Vec::new(), Vec::new(), Some(error.to_string())),
+                        Err(error) => {
+                            (Vec::new(), Vec::new(), Vec::new(), Some(error.to_string()))
+                        }
                     };
+                    worker_active.store(0, Ordering::Release);
+                    // A replaced query may have returned SQLITE_INTERRUPT;
+                    // it must never appear as an error for the new query.
+                    if worker_latest.load(Ordering::Acquire) != request.serial {
+                        continue;
+                    }
 
                     if reply_tx
                         .send(SearchUpdate {
                             serial: request.serial,
                             sources,
                             hits,
+                            suggestions,
                             error,
                         })
                         .is_err()
@@ -119,10 +175,24 @@ impl SearchWorker {
         Ok(Self {
             requests: request_tx,
             replies: reply_rx,
+            latest_serial,
+            active_serial,
+            interrupt,
         })
     }
 
     pub fn submit(&self, serial: u64, query: &str, scope: &SearchScope) -> Result<(), String> {
+        // Advertise the new generation before interrupting the old SQLite
+        // statement; the worker discards old results, including interruptions.
+        self.latest_serial.store(serial, Ordering::Release);
+        let active = self.active_serial.load(Ordering::Acquire);
+        if active != 0 && active != serial {
+            if let Ok(guard) = self.interrupt.lock() {
+                if let Some(handle) = guard.as_ref() {
+                    handle.interrupt();
+                }
+            }
+        }
         self.requests
             .send(SearchRequest {
                 serial,
