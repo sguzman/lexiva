@@ -562,10 +562,10 @@ mod tests {
     fn leading_empty_headword_is_skipped_but_following_words_import() {
         let fixture = FixtureDir::new();
         let header = "English - Spanish FreeDict";
-        let article = "house - casa\\n";
+        let article = "house - casa\n";
         let data = format!("{header}{article}");
         let index = format!(
-            "\\tA\\t{}\\n00-database-short\\tA\\t{}\\nhouse\\t{}\\t{}\\n",
+            "\tA\t{}\n00-database-short\tA\t{}\nhouse\t{}\t{}\n",
             encode(header.len() as u64),
             encode(header.len() as u64),
             encode(header.len() as u64),

@@ -316,12 +316,12 @@ mod tests {
         let fixture = Fixture::new();
         let files = fixture.files(
             "eng-spa",
-            "\\tA\\tB\\n00-database-short\\tA\\tB\\nword\\tA\\tB\\n",
+            "\tA\tB\n00-database-short\tA\tB\nword\tA\tB\n",
             "x",
         );
         let info = inspect_metadata(&files).unwrap();
         assert_eq!(info.short.as_deref(), Some("x"));
-        let broken = fixture.files("bad", "\\tB\\tB\\nword\\tA\\tB\\n", "x");
+        let broken = fixture.files("bad", "\tB\tB\nword\tA\tB\n", "x");
         assert!(inspect_metadata(&broken).is_err());
     }
 
