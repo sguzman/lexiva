@@ -433,7 +433,10 @@ mod tests {
         };
         let (tx, rx) = mpsc::channel();
         let cancel = AtomicBool::new(false);
-        assert_eq!(import_dict(&mut store, &candidate, &cancel, &tx).unwrap(), 1);
+        assert_eq!(
+            import_dict(&mut store, &candidate, &cancel, &tx).unwrap(),
+            1
+        );
         assert_eq!(store.count_entries(&id).unwrap(), 1);
         assert_eq!(
             store.get_entry(&id, "index-line:1").unwrap().unwrap().lemma,
