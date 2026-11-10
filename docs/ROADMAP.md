@@ -4,11 +4,11 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 
 ## Progress checkpoint
 
-- Verified: **52 / 100 weighted points (52%)**. Previous checkpoint: 47%; this development round **+5 percentage points**: M05 LEX-051 (+2) source/POS-attributed stable ranked result list and LEX-052 (+3) ordered definition reader with copy and provenance. Full GUI on Hyprland still requires owner-machine runtime QA.
-- Verified in [CI run 42861187298](https://github.com/sguzman/lexiva/actions/runs/42861187298): native egui compilation, formatting, strict Clippy, ranked-search/filter/Unicode and reader-copy tests, plus actual FreeDict ranked-result/definition-copy integration. Prior M04 corpus/Kaikki regressions are also in CI. The CI runner does not prove Hyprland window launch or interaction.
+- Verified: **60 / 100 weighted points (60%)**. Previous checkpoint: 52%; this development round **+8 percentage points**: LEX-050 (+3) bounded spelling suggestions/Unicode search; LEX-053 (+2) keyboard search, navigation, session history and copy; LEX-054 (+3) interruptible background SQLite queries and stale-response suppression. M05 complete at automated-test scope; Hyprland GUI acceptance remains pending.
+- Verified in [CI run 42864645742](https://github.com/sguzman/lexiva/actions/runs/42864645742): native egui compilation, formatting, strict Clippy, search suggestion/history tests, real FreeDict and M04 corpus/Kaikki regressions. [CI run 42865037021](https://github.com/sguzman/lexiva/actions/runs/42865037021) additionally tests latest-request-wins worker behavior. Automated checks do not prove an actual Hyprland window, shortcut interception, or latency on the owner's hardware.
 - Baseline commit: b0cb884657a22b3cf2ec91fa15f4765b94c3a605 on main before inception documentation.
 - Environment limitation: tool execution container currently has no Rust toolchain; actual build requires GitHub CI and user-machine QA.
-- Next: M05 LEX-050 typo suggestions and stronger accent/case ranking; LEX-053 complete keyboard search/navigation/history/copy QA; LEX-054 in-flight cancellation and background-search responsiveness. Then M06 explicit source import/discovery and headword/definition language controls. M01 LEX-011 Hyprland launch smoke remains pending.
+- Next: M06 explicit GUI source discovery/import, independent headword/definition language selectors, persistent source enabling and package-change rescans. This is the missing first-run dictionary provisioning workflow; M01 LEX-011 native Hyprland launch smoke and performance/UX QA are still pending.
 
 ## Milestones
 
@@ -19,14 +19,14 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M02 🗃️ Lexical data & search foundation | 11 | 11 | verified complete |
 | M03 📚 GNU DICT / Arch integration | 12 | 12 | verified complete |
 | M04 🌍 Wiktionary integration | 14 | 14 | verified complete |
-| M05 🔎 Search & reader | 13 | 5 | active |
+| M05 🔎 Search & reader | 13 | 13 | verified complete |
 | M06 🧰 Dictionary & language management | 8 | 0 | pending |
 | M07 🌗 Appearance and accessibility | 8 | 0 | pending |
 | M08 🌟 StarDict & TEI | 10 | 0 | pending |
 | M09 🛡️ Hardening/performance | 6 | 0 | pending |
 | M10 📦 Documentation & distribution | 4 | 0 | pending |
 | M11 ✅ Acceptance & release | 3 | 0 | pending |
-| **Total** | **100** | **52** | **active** |
+| **Total** | **100** | **60** | **active** |
 
 ### M00 🧭 Inception & engineering contracts
 
@@ -92,11 +92,11 @@ Dependency: M02 + real adapter; weight: 13 points.
 
 | ID | Deliverable | Weight | Objective exit evidence | Status |
 |---|---|---:|---|---|
-| LEX-050 🔍 | Exact/prefix/Unicode/accent-aware search and typo suggestions | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-050 🔍 | Exact/prefix/Unicode/accent-aware search and typo suggestions | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-051 📑 | Result list with source, POS and stable ordering | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-052 📜 | Rich ordered definition reader, examples, IPA and navigation | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
-| LEX-053 ⌨️ | Keyboard-only search, selection, history and copy | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-054 🧵 | Cancelable background search and responsive error reporting | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-053 ⌨️ | Keyboard-only search, selection, history and copy | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
+| LEX-054 🧵 | Cancelable background search and responsive error reporting | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 
 ### M06 🧰 Dictionary & language management
 
@@ -212,3 +212,5 @@ Excluded: online server/account, telemetry, web/mobile app, automatic OS package
 - 2026-11-10: CI [42855279348](https://github.com/sguzman/lexiva/actions/runs/42855279348) passed the 150k streaming JSONL stress fixture: 120k selected Spanish entries, 2,070,248 compressed input bytes, 266,715,136 SQLite bytes after first import and 266,797,056 bytes after reimport, VmHWM 15,132 KiB, 23.37s first import and 24.13s reimport on GitHub-hosted Ubuntu runner. A cancelled replacement retained all 120k published entries with no stale staging; FTS and entry IDs revalidated. Separately, downloaded unbundled original Kaikki raw per-word JSONL: English Wiktionary `casás` (1 record, 606 bytes, English glosses) and Spanish Wiktionary `caso` (2 records, 9,056 bytes, Spanish glosses); independent parsed JSON matched retained raw metadata and SQLite searches. 45 normal tests + 4 targeted tests; all green. LEX-043/044 verified, M04 complete to scoped tests. No 24.8GB full dump, native GUI or production-scale profiling claim.
 
 - 2026-11-10: Implemented `DictionaryStore::search_ranked` with FTS5 exact-then-prefix lookup, Latin accent-insensitive candidate matching, stable homograph/source identity, bounded results, source/POS attribution and independent language filter parameters. Native `src/app.rs` now uses an explicit dictionary chooser and `src/search_worker.rs` for background SQLite queries and stale response rejection; unselected never means all. `src/reader.rs` renders ordered glosses/examples/IPA/forms/etymology/relations and copies source-attributed plain-text definitions, preserving trailing source line breaks (verified against real Ubuntu FreeDict data). CI [42861187298](https://github.com/sguzman/lexiva/actions/runs/42861187298) covers native compilation, search and copy tests plus existing corpus regressions. LEX-051/052 verified to test scope. LEX-050/053/054 remain pending because typo suggestions, search history and true in-flight cancellation are not complete; live Hyprland GUI still untested and source manager M06 still required to index files for first-use lookup.
+
+- 2026-11-10: Added `DictionaryStore::suggest_words` (FTS5-prefix candidate limit 512, constrained 1–2-edit Unicode/Latin-folded suggestions, 8 suggestion limit, language/source restrictions), egui suggestion actions, session-only 40-term deduplicated search history, Ctrl+L search focus, Alt+Up/Down history, result arrow selection and Ctrl+Enter copy. The worker has a rusqlite interrupt handle, generation-tagged queries, queued-request coalescing and drops obsolete cancellation errors. [CI 42864645742](https://github.com/sguzman/lexiva/actions/runs/42864645742) passed fmt/check/Clippy, search/history tests and real FreeDict plus Wiktextract regressions. [CI 42865037021](https://github.com/sguzman/lexiva/actions/runs/42865037021) added a file-backed worker test ensuring the latest source-scoped request wins. LEX-050/053/054 verified to CI scope; M05 complete. Native Hyprland keyboard/GUI and optimized search latency QA are not completed by these tests.
