@@ -4,18 +4,18 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 
 ## Progress checkpoint
 
-- Verified: **3 / 100 points (3%)** (M00: LEX-001, LEX-002, LEX-003 are documentation deliverables). Previous: 0%; change +3 percentage points.
-- Not verified: Rust compilation, an operational GUI, any real dictionary search, CI, live theme detection and performance.
+- Verified: **8 / 100 points (8%)** (M00: 3 points documented; M01: 5 points compiled/tested). Previous: 3%; this round +5 percentage points.
+- Verified in CI: Rust 1.95.0, cargo fmt, cargo check, Clippy, both unit tests and committed Cargo.lock. Not verified: actual GUI launch, dictionary search, Hyprland theme detection or performance.
 - Baseline commit: b0cb884657a22b3cf2ec91fa15f4765b94c3a605 on main before inception documentation.
 - Environment limitation: tool execution container currently has no Rust toolchain; actual build requires GitHub CI and user-machine QA.
-- Next: bootstrap the eframe shell and CI; inspect run status before crediting M01.
+- Next: native GUI smoke/Hyprland verification of the shell (LEX-011), then build lexical foundation M02 while maintaining source/CI integrity.
 
 ## Milestones
 
 | Phase | Weight | Verified | Status |
 |---|---:|---:|---|
 | M00 🧭 Inception & engineering contracts | 5 | 3 | active |
-| M01 🦀 Rust bootstrap | 6 | 0 | pending |
+| M01 🦀 Rust bootstrap | 6 | 5 | active |
 | M02 🗃️ Lexical data & search foundation | 11 | 0 | pending |
 | M03 📚 GNU DICT / Arch integration | 12 | 0 | pending |
 | M04 🌍 Wiktionary integration | 14 | 0 | pending |
@@ -45,10 +45,10 @@ Dependency: M00; weight: 6 points.
 
 | ID | Deliverable | Weight | Objective exit evidence | Status |
 |---|---|---:|---|---|
-| LEX-010 🔧 | Cargo 2024 package, MSRV and manifest | 2 | Actual Rust compile/tool/CI checks pass; GUI runtime must be tested separately. | pending |
+| LEX-010 🔧 | Cargo 2024 package, MSRV and manifest | 2 | Actual Rust compile/tool/CI checks pass; GUI runtime must be tested separately. | verified complete |
 | LEX-011 🧱 | Native eframe window and recoverable startup | 1 | Actual Rust compile/tool/CI checks pass; GUI runtime must be tested separately. | pending |
-| LEX-012 🛠️ | fmt, Clippy, compilation and tests with mbx policy | 1 | Actual Rust compile/tool/CI checks pass; GUI runtime must be tested separately. | pending |
-| LEX-013 🤖 | Linux CI and lockfile validation | 2 | Actual Rust compile/tool/CI checks pass; GUI runtime must be tested separately. | pending |
+| LEX-012 🛠️ | fmt, Clippy, compilation and tests with mbx policy | 1 | Actual Rust compile/tool/CI checks pass; GUI runtime must be tested separately. | verified complete |
+| LEX-013 🤖 | Linux CI and lockfile validation | 2 | Actual Rust compile/tool/CI checks pass; GUI runtime must be tested separately. | verified complete |
 
 ### M02 🗃️ Lexical data & search foundation
 
@@ -194,3 +194,5 @@ Excluded: online server/account, telemetry, web/mobile app, automatic OS package
 ## Checkpoints
 
 - 2026-11-09: Repository inspected. Only LICENSE and .gitignore on main. Inception contracts accepted; documentation authored for M00 items 001–003; first bootstrap pending.
+
+- 2026-11-09: Commits `caab949` (native eframe shell + initial CI), `0850416` (fmt repair), `8900eda` (initial Cargo.lock); CI run [42743338343](https://github.com/sguzman/lexiva/actions/runs/42743338343) passed fmt, check, Clippy and 2 unit tests. LEX-010/012/013 verified. GUI launch not tested.

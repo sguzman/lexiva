@@ -1,6 +1,6 @@
 # Bootstrap verification note
 
-The initial shell sources are written, but **not yet verified by a compiler or GUI**. The assistant runtime has neither rustc nor Cargo, so GitHub Actions is the first available compilation gate. GitHub Actions generates the application's initial Cargo.lock for inspection and commit after successful resolution; the first source commit intentionally does not assert lockfile completeness.
+The initial native shell sources **passed Rust 1.95.0 checks in CI**, but have **not yet been tested in a real GUI**. The assistant runtime has neither rustc nor Cargo, so GitHub Actions provides compilation evidence. Initial Cargo.lock was generated and committed at `8900edaded76ccfb842044e9a4fe2c6f9730fa4d`; CI permissions have now been restored to read-only.
 
 - Language: Rust 2024; intended toolchain Rust 1.95.0 (minimum subject to actual dependency verification).
 - UI: eframe 0.37.0 (current upstream API uses App::ui), no Tauri/npm.
@@ -9,3 +9,11 @@ The initial shell sources are written, but **not yet verified by a compiler or G
 - Not implemented: dictionary import, language selection, indexes, live Hyprland system appearance validation, custom typography, keyboard shortcuts and packaging.
 
 See ROADMAP.md for acceptance, including full on-device testing.
+
+## Verified evidence
+
+- Source bootstrap commit: `caab9490799cef11224f12ed0b43b98a09a556d9`.
+- Formatting correction: `0850416c45d7b8709a13e3f8b3882aca36ac885b`.
+- Lockfile commit: `8900edaded76ccfb842044e9a4fe2c6f9730fa4d`.
+- [GitHub Actions run 42743338343](https://github.com/sguzman/lexiva/actions/runs/42743338343): successful `cargo fmt`, `cargo check --locked --all-targets`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked --all-targets`.
+- Two preferences tests passed. No runtime Wayland/Hyprland GUI validation or dictionary importer yet.
