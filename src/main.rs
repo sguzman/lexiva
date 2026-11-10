@@ -1,4 +1,9 @@
 mod app;
+// Backend integration into the GUI is tracked separately in M05/M06.
+#[allow(dead_code)]
+mod model;
+#[allow(dead_code)]
+mod storage;
 mod theme;
 
 fn main() -> eframe::Result<()> {
