@@ -82,7 +82,7 @@ impl DictionaryStore {
         conn.pragma_update(None, "foreign_keys", "ON")?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
         // Avoid changing a database that is corrupt or from a future version.
-        if version > SCHEMA_VERSION || version < 0 {
+        if !(0..=SCHEMA_VERSION).contains(&version) {
             return Err(StoreError::UnsupportedSchema(version));
         }
         // A full quick_check scans every row: run it before modifying a
