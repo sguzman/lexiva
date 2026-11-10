@@ -1,4 +1,4 @@
--- Version 2. Live entries remain separate from durable incomplete import batches.
+-- Version 3. Live entries remain separate from durable incomplete import batches.
 -- Original package-managed dictionary files are always read-only.
 BEGIN IMMEDIATE;
 CREATE TABLE dictionary_sources (
@@ -51,5 +51,16 @@ CREATE TABLE staging_entries (
     payload TEXT NOT NULL,
     PRIMARY KEY (source_id, source_entry_id)
 ) WITHOUT ROWID;
-PRAGMA user_version=2;
+-- Source visibility and priority are stored separately from immutable
+-- dictionary metadata. Import/reindex must never reset user preferences.
+CREATE TABLE source_preferences (
+    source_id TEXT PRIMARY KEY NOT NULL REFERENCES dictionary_sources(id) ON DELETE CASCADE,
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+    priority INTEGER NOT NULL
+);
+CREATE TRIGGER source_preferences_insert AFTER INSERT ON dictionary_sources BEGIN
+    INSERT INTO source_preferences (source_id, enabled, priority)
+    VALUES (new.id, 1, (SELECT coalesce(max(priority), -1) + 1 FROM source_preferences));
+END;
+PRAGMA user_version=3;
 COMMIT;

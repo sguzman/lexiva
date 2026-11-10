@@ -9,7 +9,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::model::{DictionarySource, LexicalEntry};
 
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 mod import;
 mod search;
@@ -42,7 +42,7 @@ impl fmt::Display for StoreError {
             Self::UnsupportedSchema(version) => {
                 write!(
                     f,
-                    "unsupported database schema version {version}; Lexiva supports v1 and v2"
+                    "unsupported database schema version {version}; Lexiva supports v1, v2 and v3"
                 )
             }
             Self::Integrity(details) => {
@@ -101,7 +101,11 @@ impl DictionaryStore {
         }
         match version {
             0 => conn.execute_batch(include_str!("schema.sql"))?,
-            1 => conn.execute_batch(include_str!("migration_v1_to_v2.sql"))?,
+            1 => {
+                conn.execute_batch(include_str!("migration_v1_to_v2.sql"))?;
+                conn.execute_batch(include_str!("migration_v2_to_v3.sql"))?;
+            }
+            2 => conn.execute_batch(include_str!("migration_v2_to_v3.sql"))?,
             SCHEMA_VERSION => (),
             other => return Err(StoreError::UnsupportedSchema(other)),
         }

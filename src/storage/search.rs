@@ -10,6 +10,13 @@ use crate::model::{DictionarySource, LexicalEntry};
 
 const MAX_SEARCH_HITS: usize = 100;
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct SourceSettings {
+    pub source: DictionarySource,
+    pub enabled: bool,
+    pub priority: i64,
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SearchFilters<'a> {
     pub source_id: Option<&'a str>,
@@ -37,6 +44,80 @@ impl DictionaryStore {
         .collect()
     }
 
+    pub fn list_source_settings(&self) -> Result<Vec<SourceSettings>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT s.payload, p.enabled, p.priority
+             FROM dictionary_sources s
+             JOIN source_preferences p ON p.source_id = s.id
+             ORDER BY p.priority, s.id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, bool>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })?;
+        rows.map(|row| {
+            let (payload, enabled, priority) = row?;
+            Ok(SourceSettings {
+                source: serde_json::from_str(&payload)?,
+                enabled,
+                priority,
+            })
+        })
+        .collect()
+    }
+
+    pub fn list_enabled_sources(&self) -> Result<Vec<DictionarySource>> {
+        Ok(self
+            .list_source_settings()?
+            .into_iter()
+            .filter(|item| item.enabled)
+            .map(|item| item.source)
+            .collect())
+    }
+
+    pub fn set_source_enabled(&mut self, id: &str, enabled: bool) -> Result<()> {
+        let affected = self.conn.execute(
+            "UPDATE source_preferences SET enabled = ?2 WHERE source_id = ?1",
+            params![id, enabled],
+        )?;
+        if affected == 0 {
+            return Err(super::StoreError::Invalid("source does not exist"));
+        }
+        Ok(())
+    }
+
+    /// Move a dictionary one place earlier (-1) or later (+1), retaining
+    /// all other settings. The row swap is atomic.
+    pub fn move_source(&mut self, id: &str, delta: isize) -> Result<bool> {
+        if delta != -1 && delta != 1 {
+            return Err(super::StoreError::Invalid("priority delta must be -1 or 1"));
+        }
+        let ordered = self.list_source_settings()?;
+        let Some(index) = ordered.iter().position(|item| item.source.id == id) else {
+            return Err(super::StoreError::Invalid("source does not exist"));
+        };
+        let other = index as isize + delta;
+        if other < 0 || other >= ordered.len() as isize {
+            return Ok(false);
+        }
+        let left = &ordered[index];
+        let right = &ordered[other as usize];
+        let tx = self.conn.transaction()?;
+        tx.execute(
+            "UPDATE source_preferences SET priority = ?2 WHERE source_id = ?1",
+            params![left.source.id, right.priority],
+        )?;
+        tx.execute(
+            "UPDATE source_preferences SET priority = ?2 WHERE source_id = ?1",
+            params![right.source.id, left.priority],
+        )?;
+        tx.commit()?;
+        Ok(true)
+    }
+
     /// FTS5 removes Latin accents for search. Literal exact spellings are
     /// ranked before prefixes, then source and entry IDs break ties.
     /// All MATCH input is quoted, never interpreted as FTS query syntax.
@@ -61,11 +142,13 @@ impl DictionaryStore {
                  FROM lexical_fts
                  JOIN lexical_entries e ON e.id = lexical_fts.rowid
                  JOIN dictionary_sources s ON s.id = e.source_id
+                 JOIN source_preferences p ON p.source_id = s.id
                  WHERE lexical_fts MATCH ?1
+                   AND p.enabled = 1
                    AND (?2 IS NULL OR e.source_id = ?2)
                    AND (?3 IS NULL OR e.headword_language = ?3)
                    AND (?4 IS NULL OR e.definition_language = ?4)
-                 ORDER BY e.lemma COLLATE NOCASE, e.source_id, e.source_entry_id, e.id
+                 ORDER BY p.priority, e.lemma COLLATE NOCASE, e.source_id, e.source_entry_id, e.id
                  LIMIT ?5",
             )?;
             let rows = statement.query_map(
@@ -92,19 +175,9 @@ impl DictionaryStore {
                 }
             }
         }
-        collected.sort_by(|left, right| {
-            right
-                .exact
-                .cmp(&left.exact)
-                .then_with(|| {
-                    left.entry
-                        .lemma
-                        .to_lowercase()
-                        .cmp(&right.entry.lemma.to_lowercase())
-                })
-                .then_with(|| left.entry.source_id.cmp(&right.entry.source_id))
-                .then_with(|| left.entry.source_entry_id.cmp(&right.entry.source_entry_id))
-        });
+        // The SQL order is source-priority then spelling; stable sort keeps
+        // that order within the two exact/prefix relevance groups.
+        collected.sort_by(|left, right| right.exact.cmp(&left.exact));
         collected.truncate(limit.min(MAX_SEARCH_HITS));
         Ok(collected)
     }
@@ -143,11 +216,13 @@ impl DictionaryStore {
             let mut statement = self.conn.prepare(
                 "SELECT DISTINCT e.lemma FROM lexical_fts
                  JOIN lexical_entries e ON e.id = lexical_fts.rowid
+                 JOIN source_preferences p ON p.source_id = e.source_id
                  WHERE lexical_fts MATCH ?1
+                   AND p.enabled = 1
                    AND (?2 IS NULL OR e.source_id = ?2)
                    AND (?3 IS NULL OR e.headword_language = ?3)
                    AND (?4 IS NULL OR e.definition_language = ?4)
-                 ORDER BY e.lemma COLLATE NOCASE
+                 ORDER BY p.priority, e.lemma COLLATE NOCASE
                  LIMIT 512",
             )?;
             let rows = statement.query_map(
