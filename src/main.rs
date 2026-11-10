@@ -1,4 +1,7 @@
 mod app;
+// Early backend adapter, not yet linked to the GUI.
+#[allow(dead_code)]
+mod dict;
 // Backend integration into the GUI is tracked separately in M05/M06.
 #[allow(dead_code)]
 mod model;

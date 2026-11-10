@@ -19,6 +19,7 @@ const MAX_QUERY_RESULTS: usize = 100;
 #[derive(Debug)]
 pub enum StoreError {
     Database(rusqlite::Error),
+    Io(std::io::Error),
     Json(serde_json::Error),
     Invalid(&'static str),
     UnsupportedSchema(i64),
@@ -31,6 +32,7 @@ impl fmt::Display for StoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Database(error) => write!(f, "SQLite error: {error}"),
+            Self::Io(error) => write!(f, "dictionary file error: {error}"),
             Self::Json(error) => write!(f, "dictionary record serialization error: {error}"),
             Self::Invalid(reason) => write!(f, "invalid dictionary data: {reason}"),
             Self::UnsupportedSchema(version) => {
