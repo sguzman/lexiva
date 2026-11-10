@@ -254,6 +254,67 @@ mod tests {
     }
 
     #[test]
+    fn abandoned_on_disk_stage_does_not_replace_live_words() {
+        static NEXT_DB: AtomicUsize = AtomicUsize::new(0);
+        let number = NEXT_DB.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "lexiva-stage-{}-{number}.sqlite",
+            std::process::id()
+        ));
+        struct Cleanup(std::path::PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let _cleanup = Cleanup(path.clone());
+
+        {
+            let mut first = DictionaryStore::open(&path).unwrap();
+            first.upsert_source(&source("words")).unwrap();
+            first.replace_source_entries("words", &[entry(999, "words")])
+                .unwrap();
+            // Simulate a process that dies between committed batches and
+            // does not run ImportSession::drop.
+            first
+                .conn
+                .execute(
+                    "INSERT INTO staging_imports (source_id) VALUES ('words')",
+                    [],
+                )
+                .unwrap();
+            first
+                .conn
+                .execute(
+                    "INSERT INTO staging_entries (
+                        source_id, source_entry_id, lemma, payload
+                     ) VALUES ('words', '1', 'palabra1', '{}')",
+                    [],
+                )
+                .unwrap();
+        }
+
+        let mut reopened = DictionaryStore::open(&path).unwrap();
+        assert_eq!(reopened.schema_version().unwrap(), 2);
+        assert_eq!(reopened.count_entries("words").unwrap(), 1);
+        assert_eq!(reopened.staged_count("words").unwrap(), 1);
+        assert!(reopened.get_entry("words", "999").unwrap().is_some());
+        // A concurrent/new import cannot steal or implicitly publish it.
+        assert!(reopened.begin_import("words").is_err());
+        assert!(reopened.discard_staged_import("words").unwrap());
+        assert_eq!(reopened.staged_count("words").unwrap(), 0);
+        assert_eq!(reopened.count_entries("words").unwrap(), 1);
+        reopened.check_catalog_integrity().unwrap();
+
+        let mut replacement = reopened.begin_import("words").unwrap();
+        replacement.stage_batch(&[entry(2, "words")]).unwrap();
+        replacement.publish().unwrap();
+        assert_eq!(reopened.count_entries("words").unwrap(), 1);
+        assert!(reopened.get_entry("words", "2").unwrap().is_some());
+        reopened.check_fts_index().unwrap();
+    }
+
+    #[test]
     fn large_stream_is_bounded_and_published_atomically() {
         let mut db = DictionaryStore::in_memory().unwrap();
         db.upsert_source(&source("words")).unwrap();

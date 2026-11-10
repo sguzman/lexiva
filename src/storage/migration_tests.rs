@@ -94,6 +94,19 @@ mod tests {
     }
 
     #[test]
+    fn damaged_cache_file_is_not_overwritten_automatically() {
+        let path = std::env::temp_dir().join(format!(
+            "lexiva-corrupt-{}.sqlite",
+            std::process::id()
+        ));
+        let original = b"invalid sqlite database, preserve my bytes";
+        std::fs::write(&path, original).unwrap();
+        assert!(DictionaryStore::open(&path).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    #[test]
     fn unsupported_future_version_is_not_modified() {
         let conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "user_version", 99).unwrap();

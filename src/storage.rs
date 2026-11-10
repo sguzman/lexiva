@@ -85,9 +85,10 @@ impl DictionaryStore {
         if version > SCHEMA_VERSION || version < 0 {
             return Err(StoreError::UnsupportedSchema(version));
         }
-        let integrity: String = conn.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
-        if integrity != "ok" {
-            return Err(StoreError::Integrity(integrity));
+        // A full quick_check scans every row: run it before modifying a
+        // legacy database, not on every normal startup of a huge dictionary.
+        if version == 1 {
+            Self::check_connection_integrity(&conn)?;
         }
         match version {
             0 => conn.execute_batch(include_str!("schema.sql"))?,
@@ -96,6 +97,19 @@ impl DictionaryStore {
             other => return Err(StoreError::UnsupportedSchema(other)),
         }
         Ok(Self { conn })
+    }
+
+    fn check_connection_integrity(conn: &Connection) -> Result<()> {
+        let integrity: String = conn.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+        if integrity != "ok" {
+            return Err(StoreError::Integrity(integrity));
+        }
+        Ok(())
+    }
+
+    /// An explicit O(database size) check. Normal startup remains inexpensive.
+    pub fn check_catalog_integrity(&self) -> Result<()> {
+        Self::check_connection_integrity(&self.conn)
     }
 
     pub fn schema_version(&self) -> Result<i64> {
