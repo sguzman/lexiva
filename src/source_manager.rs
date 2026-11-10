@@ -133,13 +133,10 @@ fn source_health(source: &DictionarySource) -> SourceHealth {
 
 fn record_signature(
     store: &mut DictionaryStore,
-    source_id: &str,
+    source: &DictionarySource,
     signature: String,
 ) -> Result<(), String> {
-    let mut source = store
-        .get_source(source_id)
-        .map_err(|error| error.to_string())?
-        .ok_or_else(|| "source disappeared during import".to_owned())?;
+    let mut source = source.clone();
     if !source.metadata.is_object() {
         source.metadata = json!({});
     }
@@ -235,9 +232,15 @@ fn import_dict(
     let signature = source_signature(&candidate.source).map_err(|error| error.to_string())?;
     let reader =
         DictReader::open(&candidate.source, &candidate.files).map_err(|error| error.to_string())?;
-    store
-        .upsert_source(&candidate.source)
-        .map_err(|error| error.to_string())?;
+    if store
+        .get_source(&candidate.source.id)
+        .map_err(|error| error.to_string())?
+        .is_none()
+    {
+        store
+            .upsert_source(&candidate.source)
+            .map_err(|error| error.to_string())?;
+    }
     let count = store
         .import_stream(
             &candidate.source.id,
@@ -248,7 +251,7 @@ fn import_dict(
             },
         )
         .map_err(|error| error.to_string())?;
-    record_signature(store, &candidate.source.id, signature)?;
+    record_signature(store, &candidate.source, signature)?;
     Ok(count)
 }
 
@@ -277,9 +280,15 @@ fn import_jsonl(
     let signature = source_signature(&source).map_err(|error| error.to_string())?;
     let reader =
         WiktextractReader::open(path, &source, edition).map_err(|error| error.to_string())?;
-    store
-        .upsert_source(&source)
-        .map_err(|error| error.to_string())?;
+    if store
+        .get_source(&id)
+        .map_err(|error| error.to_string())?
+        .is_none()
+    {
+        store
+            .upsert_source(&source)
+            .map_err(|error| error.to_string())?;
+    }
     let count = store
         .import_stream(
             &id,
@@ -290,7 +299,7 @@ fn import_jsonl(
             },
         )
         .map_err(|error| error.to_string())?;
-    record_signature(store, &id, signature)?;
+    record_signature(store, &source, signature)?;
     Ok((id, count))
 }
 
