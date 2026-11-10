@@ -9,6 +9,7 @@ The adapter lives in `src/dict.rs`, `src/dict/dictzip.rs` and `src/dict/metadata
 - Nonrecursive, read-only discovery in `/usr/share/dictd`, `/usr/local/share/dictd` and explicitly supplied directories.
 - `.index` headword and checked DICT base-64 byte offsets/lengths, with an index-line size limit of 16 KiB.
 - `.dict` exact range reads and dictzip v1 `.dict.dz` random-access raw-DEFLATE reads, with output bounds and one-chunk cache; article size limited to 4 MiB.
+- Some FreeDict distributions contain index rows with an empty headword (including the first row). Lexiva now skips these **only after** parsing and validating their base64 offset/length and data bounds, in both metadata discovery and actual imports. They never become searchable words. See [upstream-style FreeDict empty-index bug report](https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=946390).
 - Truncated entries, invalid offsets and malformed RA headers cannot be silently published to the search index.
 - Administrative `00-database-*` records do not appear as normal searchable words. Their short description, long info and URL are captured as original texts where present.
 
@@ -38,3 +39,9 @@ GitHub Actions on Ubuntu 24.04 installs `dict-freedict-spa-eng`, `dict-freedict-
 - Live GUI source controls, source rescan after package updates and dictionary-language filters belong to M05/M06.
 
 Format references: [dictd file format](https://man.archlinux.org/man/dictd.8), [dictfmt(1)](https://manpages.ubuntu.com/manpages/noble/en/man1/dictfmt.1.html), [FreeDict source/rights documentation](https://freedict.org/documentation/).
+
+## Arch native QA regression — empty-headword index records
+
+The owner's first **Scan DICT files** operation on EndeavourOS failed at `/usr/share/dictd/eng-spa.index` with `empty DICT headword`, before the source was indexed. The metadata inspector shared `parse_row` with the import reader and rejected such rows unconditionally. This was a real blocker for installed DICT discovery, not a user setup error.
+
+The patch at `3224be0` allows a structurally valid blank headword but validates the base64 fields, length (≤ 4 MiB), and range against the data body before skipping. Other malformed fields, overflow, and truncated records remain hard failures. Synthetic tests cover leading blank records followed by a `00-database-short` header and an actual word imported into SQLite/FTS, plus invalid blank record bounds. **CI [42903091436](https://github.com/sguzman/lexiva/actions/runs/42903091436) passed all 74 regular tests and four separate real-FreeDict/Wiktextract/stress checks (78 executed, no failures).** This is not yet proof that the owner's exact installed `eng-spa.index` has been successfully scanned; a repeat native scan is required. Original dictionary files remain read-only.
