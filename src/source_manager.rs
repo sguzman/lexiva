@@ -563,10 +563,12 @@ mod tests {
         cancel.store(false, Ordering::Release);
         assert!(store.remove_source(&id).unwrap());
         assert_eq!(store.count_entries(&id).unwrap(), 0);
-        assert!(store
-            .search_ranked("casa", SearchFilters::default(), 10)
-            .unwrap()
-            .is_empty());
+        assert!(
+            store
+                .search_ranked("casa", SearchFilters::default(), 10)
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(store.count_entries(&json_id).unwrap(), 1);
 
         assert_eq!(fs::read(&index_path).unwrap(), original_index);
