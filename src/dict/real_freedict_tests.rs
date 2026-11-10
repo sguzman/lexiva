@@ -2,7 +2,8 @@
 //! Ubuntu's FreeDict spa-eng and eng-spa data packages. None is bundled.
 
 use super::*;
-use crate::storage::DictionaryStore;
+use crate::reader;
+use crate::storage::{DictionaryStore, SearchFilters};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -93,6 +94,27 @@ fn installed_freedict_packages_agree_with_independent_gzip() {
                 .iter()
                 .any(|item| item.source_entry_id == sample.source_entry_id)
         );
+        // The new native reader consumes exactly this source-attributed
+        // ranked result, rather than reparsing dictionary files in the UI.
+        let ranked = store
+            .search_ranked(
+                &sample.lemma,
+                SearchFilters {
+                    source_id: Some(base),
+                    ..SearchFilters::default()
+                },
+                100,
+            )
+            .unwrap();
+        let selected = ranked
+            .iter()
+            .find(|hit| hit.entry.source_entry_id == sample.source_entry_id)
+            .unwrap();
+        assert_eq!(selected.source.id, base);
+        assert_eq!(selected.entry.senses, sample.senses);
+        let copied = reader::copy_text(selected);
+        assert!(copied.contains(&sample.senses[0].glosses[0]));
+        assert!(copied.contains(&selected.source.title));
         store.check_fts_index().unwrap();
         eprintln!(
             "Real FreeDict QA: {base}, {count} entries, {} bytes decompressed, word {}",
