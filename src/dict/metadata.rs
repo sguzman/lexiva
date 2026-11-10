@@ -279,7 +279,7 @@ mod tests {
         let start_second = short.len() + 1;
         let index = format!(
             "00-database-short\tA\t{}\n00-database-url\t{}\t{}\n",
-            encode(start_second as u64),
+            encode(short.len() as u64),
             encode(start_second as u64),
             encode((data_bytes.len() - start_second) as u64)
         );
