@@ -94,7 +94,10 @@ impl WiktextractReader {
                 "Wiktionary edition does not match source definition language",
             ));
         }
-        let name = path.file_name().and_then(|part| part.to_str()).unwrap_or("");
+        let name = path
+            .file_name()
+            .and_then(|part| part.to_str())
+            .unwrap_or("");
         let file = File::open(path)?;
         let input: Box<dyn Read + Send> = if name.ends_with(".jsonl.gz") {
             Box::new(MultiGzDecoder::new(file))
