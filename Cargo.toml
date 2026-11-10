@@ -1,0 +1,15 @@
+[package]
+name = "lexiva"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95.0"
+authors = ["Salvador Guzman"]
+description = "Native offline-first multilingual dictionary reader"
+license = "MIT"
+repository = "https://github.com/sguzman/lexiva"
+readme = "README.md"
+keywords = ["dictionary", "linguistics", "egui", "offline"]
+categories = ["gui", "text-processing"]
+
+[dependencies]
+eframe = { version = "=0.37.0", features = ["persistence"] }
