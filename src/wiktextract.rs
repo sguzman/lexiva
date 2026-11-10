@@ -316,7 +316,7 @@ fn map_record(
     }
     let etymologies = field(&raw, "etymology_text")
         .map(|text| vec![text.to_owned()])
-        .unwrap_or_default();
+        .unwrap_or_else(|| strings(&raw, "etymology_texts"));
     let part_of_speech = field(&raw, "pos").map(str::to_owned);
     let entry = LexicalEntry {
         source_id: source_id.to_owned(),
@@ -343,3 +343,9 @@ fn map_record(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod large_tests;
+
+#[cfg(test)]
+mod real_tests;

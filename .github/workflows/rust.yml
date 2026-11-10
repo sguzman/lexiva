@@ -38,4 +38,21 @@ jobs:
           test -s /usr/share/dictd/freedict-spa-eng.index
           test -s /usr/share/dictd/freedict-eng-spa.index
       - name: Test actual installed FreeDict dictionaries
-        run: cargo test --locked --all-targets -- --ignored --nocapture
+        run: cargo test --locked --all-targets dict::real_freedict_tests::installed_freedict_packages_agree_with_independent_gzip -- --ignored --nocapture
+      - name: Stress-test 150k Wiktextract records, cancellation, reimport, and memory
+        run: cargo test --locked --all-targets wiktextract::large_tests::corpus_150k_records_import_cancel_reimport_and_measure_resources -- --ignored --nocapture
+      - name: Fetch authentic raw per-word Wiktextract data
+        run: |
+          curl --fail --location --retry 3 --max-time 90 --max-filesize 2000000 --silent --show-error \
+            --output /tmp/lexiva-enwiktionary-casas.jsonl \
+            'https://kaikki.org/dictionary/Spanish/meaning/c/ca/cas%C3%A1s.jsonl'
+          curl --fail --location --retry 3 --max-time 90 --max-filesize 2000000 --silent --show-error \
+            --output /tmp/lexiva-eswiktionary-caso.jsonl \
+            'https://kaikki.org/eswiktionary/Espa%C3%B1ol/meaning/c/ca/caso.jsonl'
+          test -s /tmp/lexiva-enwiktionary-casas.jsonl
+          test -s /tmp/lexiva-eswiktionary-caso.jsonl
+      - name: Test authentic English- and Spanish-edition Wiktextract records
+        env:
+          LEXIVA_EN_REAL_JSONL: /tmp/lexiva-enwiktionary-casas.jsonl
+          LEXIVA_ES_REAL_JSONL: /tmp/lexiva-eswiktionary-caso.jsonl
+        run: cargo test --locked --all-targets wiktextract::real_tests::authentic_ -- --ignored --nocapture
