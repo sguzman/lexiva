@@ -3,6 +3,7 @@
 
 use super::*;
 use std::path::PathBuf;
+use crate::storage::DictionaryStore;
 use std::process::Command;
 
 #[test]
@@ -24,7 +25,10 @@ fn installed_freedict_packages_agree_with_independent_gzip() {
         assert_eq!(source.definition_language.as_deref(), Some(to));
         assert_eq!(source.format, crate::model::SourceFormat::Dict);
         assert!(source.origin.as_deref().unwrap().ends_with(".index"));
-        assert_eq!(source.license, None, "per-dictionary license must be explicit");
+        assert_eq!(
+            source.license, None,
+            "per-dictionary license must be explicit"
+        );
 
         let output = Command::new("gzip")
             .arg("-dc")
@@ -84,7 +88,11 @@ fn installed_freedict_packages_agree_with_independent_gzip() {
             Some(sample.clone())
         );
         let results = store.search_prefix(&sample.lemma, Some(base), 100).unwrap();
-        assert!(results.iter().any(|item| item.source_entry_id == sample.source_entry_id));
+        assert!(
+            results
+                .iter()
+                .any(|item| item.source_entry_id == sample.source_entry_id)
+        );
         store.check_fts_index().unwrap();
         eprintln!(
             "Real FreeDict QA: {base}, {count} entries, {} bytes decompressed, word {}",

@@ -2,7 +2,7 @@
 //! Never rewrite source files or assume a license based on the filename.
 
 use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Read};
 use std::path::Path;
 
 use serde_json::json;
@@ -73,11 +73,15 @@ pub fn inspect_metadata(files: &DictFiles) -> io::Result<DictMetadata> {
         if line.last() == Some(&b'\r') {
             line.pop();
         }
-        let text = std::str::from_utf8(&line).map_err(|_| invalid("invalid metadata index UTF-8"))?;
+        let text =
+            std::str::from_utf8(&line).map_err(|_| invalid("invalid metadata index UTF-8"))?;
         let row = parse_row(text)?;
         if let Some(key) = admin_key(row.lemma) {
             if row.length > MAX_ARTICLE_BYTES
-                || row.start.checked_add(row.length).is_none_or(|end| end > data.len())
+                || row
+                    .start
+                    .checked_add(row.length)
+                    .is_none_or(|end| end > data.len())
             {
                 return Err(invalid("DICT administrative article exceeds data bounds"));
             }
@@ -227,10 +231,8 @@ mod tests {
     impl Fixture {
         fn new() -> Self {
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!(
-                "lexiva-meta-{}-{id}",
-                std::process::id()
-            ));
+            let path =
+                std::env::temp_dir().join(format!("lexiva-meta-{}-{id}", std::process::id()));
             fs::create_dir(&path).unwrap();
             Self(path)
         }
@@ -274,7 +276,7 @@ mod tests {
         let short = "Spanish - English FreeDict";
         let data = format!("{short}\nFound at https://freedict.org/\n");
         let data_bytes = data.as_bytes();
-        let start_second = short.len();
+        let start_second = short.len() + 1;
         let index = format!(
             "00-database-short\tA\t{}\n00-database-url\t{}\t{}\n",
             encode(start_second as u64),

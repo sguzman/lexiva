@@ -76,7 +76,7 @@ impl DictionaryStore {
     }
 
     #[cfg(test)]
-    fn in_memory() -> Result<Self> {
+    pub(crate) fn in_memory() -> Result<Self> {
         Self::initialize(Connection::open_in_memory()?)
     }
 
