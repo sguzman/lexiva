@@ -8,7 +8,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 - Verified in [CI run 42880153881](https://github.com/sguzman/lexiva/actions/runs/42880153881): formatting, native compilation, strict Clippy, 63 regular tests and 4 targeted real-source/stress tests (67 executed, 0 failures). Newly verified v2→v3 preference migration, on-disk enable/priority persistence, exact and suggestion filtering of disabled sources, file signatures, changed/missing source handling, reindex and cancellation without metadata/index loss. Native Hyprland runtime acceptance remains pending.
 - Baseline commit: b0cb884657a22b3cf2ec91fa15f4765b94c3a605 on main before inception documentation.
 - Environment limitation: tool execution container currently has no Rust toolchain; actual build requires GitHub CI and user-machine QA.
-- Next: M07 day/night system theme, typography/accessibility and reader polish. The native Hyprland GUI smoke M01 LEX-011 and real-user search/import experience still require acceptance testing; full-file cryptographic hashes, automatic package watchers and abandoned-stage GUI recovery are not yet implemented.
+- Current M07 work: `cb141d4` introduced local Fontconfig sans-serif fallback, adjustable definition typography, and persisted selected dictionary/language pair/reader size; `341ed5f` fixed rustfmt output. Native GUI/font rendering and automated verification of this round are pending; this work does not yet earn completion points. The native Hyprland GUI smoke M01 LEX-011 and real-user search/import experience also require acceptance testing; full-file cryptographic hashes, automatic package watchers and abandoned-stage GUI recovery are not yet implemented.
 
 ## Milestones
 
@@ -21,7 +21,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M04 🌍 Wiktionary integration | 14 | 14 | verified complete |
 | M05 🔎 Search & reader | 13 | 13 | verified complete |
 | M06 🧰 Dictionary & language management | 8 | 8 | verified complete |
-| M07 🌗 Appearance and accessibility | 8 | 0 | pending |
+| M07 🌗 Appearance and accessibility | 8 | 0 | active |
 | M08 🌟 StarDict & TEI | 10 | 0 | pending |
 | M09 🛡️ Hardening/performance | 6 | 0 | pending |
 | M10 📦 Documentation & distribution | 4 | 0 | pending |
@@ -116,9 +116,9 @@ Dependency: M01 + M05; weight: 8 points.
 | ID | Deliverable | Weight | Objective exit evidence | Status |
 |---|---|---:|---|---|
 | LEX-070 🌗 | Live System/Light/Dark selector and Hyprland detection | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-071 🖋️ | Fonts, fallbacks, scaling and readable definition typography | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-071 🖋️ | Fonts, fallbacks, scaling and readable definition typography | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | active |
 | LEX-072 ♿ | Focus, contrast, zoom, keyboard and reduced-motion behavior | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-073 🧩 | Persistent UI configuration, window and theme | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-073 🧩 | Persistent UI configuration, window and theme | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | active |
 
 ### M08 🌟 StarDict & TEI
 

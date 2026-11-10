@@ -361,6 +361,20 @@ mod tests {
     }
 
     #[test]
+    fn saved_scope_round_trips_without_enabling_unselected_sources() {
+        for scope in [
+            SearchScope::Unselected,
+            SearchScope::All,
+            SearchScope::Source("dict:spa-eng:/usr/share/dictd".to_owned()),
+        ] {
+            assert_eq!(SearchScope::from_storage_value(&scope.storage_value()), scope);
+        }
+        for invalid in ["", "invalid", "source:", "ALL", "all indexed dictionaries"] {
+            assert_eq!(SearchScope::from_storage_value(invalid), SearchScope::Unselected);
+        }
+    }
+
+    #[test]
     fn unselected_scope_never_means_search_every_source() {
         assert_eq!(SearchScope::default(), SearchScope::Unselected);
         assert_eq!(SearchScope::Unselected.label(&[]), "Choose a dictionary");
