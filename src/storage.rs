@@ -282,7 +282,7 @@ mod tests {
         store
             .replace_source_entries("es-en", &[a.clone(), b.clone()])
             .unwrap();
-        store.replace_source_entries("es-es", &[c.clone()]).unwrap();
+        store.replace_source_entries("es-es", std::slice::from_ref(&c)).unwrap();
         assert_eq!(store.count_entries("es-en").unwrap(), 2);
         assert_eq!(store.get_entry("es-en", "homograph:1").unwrap(), Some(a));
         assert_eq!(store.get_entry("es-en", "homograph:2").unwrap(), Some(b));
@@ -302,7 +302,7 @@ mod tests {
         store.upsert_source(&source("es-en", "en")).unwrap();
         let old = entry("es-en", "old", "árbol");
         store
-            .replace_source_entries("es-en", &[old.clone()])
+            .replace_source_entries("es-en", std::slice::from_ref(&old))
             .unwrap();
 
         let first = entry("es-en", "same", "casa");
@@ -317,7 +317,7 @@ mod tests {
 
         let newer = entry("es-en", "new", "hogar");
         store
-            .replace_source_entries("es-en", &[newer.clone()])
+            .replace_source_entries("es-en", std::slice::from_ref(&newer))
             .unwrap();
         assert!(store.search_prefix("ár", None, 10).unwrap().is_empty());
         assert_eq!(store.search_prefix("hog", None, 10).unwrap(), vec![newer]);
