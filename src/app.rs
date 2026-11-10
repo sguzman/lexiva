@@ -6,8 +6,8 @@ use eframe::egui;
 
 use crate::model::DictionarySource;
 use crate::reader;
-use crate::source_manager::SourceManager;
 use crate::search_worker::{self, SearchScope, SearchWorker};
+use crate::source_manager::SourceManager;
 use crate::storage::SearchHit;
 use crate::theme::{self, ThemeChoice};
 
@@ -108,9 +108,11 @@ impl LexivaApp {
                         let import = SourceManager::spawn(path, &cc.egui_ctx);
                         match (search, import) {
                             (Ok(search), Ok(import)) => (Some(search), Some(import), None),
-                            (Err(error), _) | (_, Err(error)) => {
-                                (None, None, Some(format!("Could not start workers: {error}")))
-                            }
+                            (Err(error), _) | (_, Err(error)) => (
+                                None,
+                                None,
+                                Some(format!("Could not start workers: {error}")),
+                            ),
                         }
                     }
                     Err(error) => (None, None, Some(error.to_string())),

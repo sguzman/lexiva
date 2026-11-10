@@ -4,9 +4,9 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::Arc;
 use std::thread;
 
 use eframe::egui;
@@ -47,7 +47,12 @@ fn stable_source_id(prefix: &str, path: &Path, suffix: &str) -> String {
     // source metadata for identification. A different edition/filter is a
     // different logical Wiktextract index, not a destructive reimport.
     let mut hash = 0xcbf29ce484222325_u64;
-    for byte in path.to_string_lossy().bytes().chain([0]).chain(suffix.bytes()) {
+    for byte in path
+        .to_string_lossy()
+        .bytes()
+        .chain([0])
+        .chain(suffix.bytes())
+    {
         hash ^= byte as u64;
         hash = hash.wrapping_mul(0x100000001b3);
     }
@@ -90,8 +95,8 @@ fn import_dict(
     cancel: &AtomicBool,
     tx: &Sender<Event>,
 ) -> Result<usize, String> {
-    let reader = DictReader::open(&candidate.source, &candidate.files)
-        .map_err(|error| error.to_string())?;
+    let reader =
+        DictReader::open(&candidate.source, &candidate.files).map_err(|error| error.to_string())?;
     store
         .upsert_source(&candidate.source)
         .map_err(|error| error.to_string())?;
@@ -129,8 +134,8 @@ fn import_jsonl(
         word_language,
     )
     .map_err(|error| error.to_string())?;
-    let reader = WiktextractReader::open(path, &source, edition)
-        .map_err(|error| error.to_string())?;
+    let reader =
+        WiktextractReader::open(path, &source, edition).map_err(|error| error.to_string())?;
     store
         .upsert_source(&source)
         .map_err(|error| error.to_string())?;
@@ -180,7 +185,6 @@ impl SourceManager {
                     }
                 };
                 while let Ok(command) = incoming.recv() {
-                    worker_cancel.store(false, Ordering::Release);
                     let result = match command {
                         Command::Scan(path) => match scan(&store, path.as_deref()) {
                             Ok(found) => {
@@ -189,13 +193,10 @@ impl SourceManager {
                             }
                             Err(error) => Err(error),
                         },
-                        Command::ImportDict(candidate) => import_dict(
-                            &mut store,
-                            &candidate,
-                            &worker_cancel,
-                            &outgoing,
-                        )
-                        .map(|count| Some((candidate.source.id, count))),
+                        Command::ImportDict(candidate) => {
+                            import_dict(&mut store, &candidate, &worker_cancel, &outgoing)
+                                .map(|count| Some((candidate.source.id, count)))
+                        }
                         Command::ImportJsonl {
                             path,
                             edition,
@@ -412,10 +413,8 @@ mod tests {
     #[test]
     fn missing_dictionary_folder_is_empty_not_error() {
         let store = DictionaryStore::in_memory().unwrap();
-        let missing = std::env::temp_dir().join(format!(
-            "lexiva-missing-folder-{}",
-            std::process::id()
-        ));
+        let missing =
+            std::env::temp_dir().join(format!("lexiva-missing-folder-{}", std::process::id()));
         // scan() also includes any system DICT files: it is therefore
         // tested by checking that it does not fail due to this missing folder.
         assert!(scan(&store, Some(&missing)).is_ok());
