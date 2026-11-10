@@ -17,3 +17,7 @@ Revisit decisions only when dependencies or actual requirements make a change ne
 ## Implemented foundation (schema v2)
 
 `src/model.rs` preserves source-aware lexical structure. `src/storage.rs` provides source-scoped SQLite/FTS5 index access; `src/storage/import.rs` implements bounded staged imports and single-transaction publication, and `src/migration_v1_to_v2.sql` handles existing v1 catalogs. Abandoned stage rows require explicit discard; a live full-text index can be rebuilt non-destructively. See [STORAGE.md](STORAGE.md) for validated behavior and limits, and [DEPENDENCIES.md](DEPENDENCIES.md) for crate/data-license decisions. Real dictionary adapters and GUI integration are still pending.
+
+## Wiktextract adapter
+
+The read-only `src/wiktextract.rs` adapter streams original JSONL/gzip records into bounded structured `LexicalEntry` values for the established staged SQLite publisher. It stores original JSON objects as structured metadata for forward-compatibility and makes definition language an explicit choice derived from **Wiktionary edition**, independent of entry `lang_code`. Actual real-dump semantic compatibility and corpus-scale profiling remain pending. See [WIKTEXTRACT.md](WIKTEXTRACT.md).

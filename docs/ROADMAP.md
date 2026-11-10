@@ -4,11 +4,11 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 
 ## Progress checkpoint
 
-- Verified: **33 / 100 weighted points (33%)**. Previous checkpoint: 29%; this development round **+4 percentage points** for M03 LEX-033 (source language/metadata and verbatim article formatting) +2 and LEX-034 (actual installed FreeDict cross-check) +2. M03 is verified complete; target-machine GUI acceptance remains separate.
-- Verified in [CI run 42838302466](https://github.com/sguzman/lexiva/actions/runs/42838302466): formatting, compilation, strict Clippy; **36 unit tests passed** (1 real-package test intentionally ignored in the ordinary pass), then **1 real-package test passed** after installing both Ubuntu FreeDict packages. Independently verified every article in 4,507 Spanish→English and 5,912 English→Spanish records against system gzip. Native EndeavourOS/Hyprland and optimized performance remain unverified.
+- Verified: **42 / 100 weighted points (42%)**. Previous checkpoint: 33%; this development round **+9 percentage points**: M04 LEX-040 streaming JSONL/gzip (+3), LEX-041 structured senses/forms/examples/IPA (+3), LEX-042 separate headword and definition language by Wiktionary edition (+3). Large real-dump validation remains pending.
+- Verified in [CI run 42845015317](https://github.com/sguzman/lexiva/actions/runs/42845015317): formatting, compilation, strict Clippy, **45 regular tests passed**, and the **real FreeDict integration test passed**. Nine new Wiktextract tests cover en/es edition semantics, JSONL/gzip equivalence, structured metadata, bounded lines, source-scoped SQLite import, progress and malformed-record rollback. Authentic Wiktionary corpus QA and target Hyprland UI validation are not verified.
 - Baseline commit: b0cb884657a22b3cf2ec91fa15f4765b94c3a605 on main before inception documentation.
 - Environment limitation: tool execution container currently has no Rust toolchain; actual build requires GitHub CI and user-machine QA.
-- Next: M04 Wiktextract streaming JSONL and gzip JSONL import, starting with LEX-040 and real schema fixtures; preserve separate headword/definition languages for English- and Spanish-edition data. M01 LEX-011 native Hyprland GUI smoke remains outstanding.
+- Next: M04 LEX-043 large-corpus progress/cancellation/disk/memory evaluation and LEX-044 real-record schema/semantic QA. User-visible dictionary import and reader GUI remain M05/M06; M01 LEX-011 native Hyprland smoke is still outstanding.
 
 ## Milestones
 
@@ -18,7 +18,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M01 🦀 Rust bootstrap | 6 | 5 | active |
 | M02 🗃️ Lexical data & search foundation | 11 | 11 | verified complete |
 | M03 📚 GNU DICT / Arch integration | 12 | 12 | verified complete |
-| M04 🌍 Wiktionary integration | 14 | 0 | pending |
+| M04 🌍 Wiktionary integration | 14 | 9 | active |
 | M05 🔎 Search & reader | 13 | 0 | pending |
 | M06 🧰 Dictionary & language management | 8 | 0 | pending |
 | M07 🌗 Appearance and accessibility | 8 | 0 | pending |
@@ -26,7 +26,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M09 🛡️ Hardening/performance | 6 | 0 | pending |
 | M10 📦 Documentation & distribution | 4 | 0 | pending |
 | M11 ✅ Acceptance & release | 3 | 0 | pending |
-| **Total** | **100** | **33** | **active** |
+| **Total** | **100** | **42** | **active** |
 
 ### M00 🧭 Inception & engineering contracts
 
@@ -80,9 +80,9 @@ Dependency: M02; weight: 14 points.
 
 | ID | Deliverable | Weight | Objective exit evidence | Status |
 |---|---|---:|---|---|
-| LEX-040 🌐 | Streaming JSONL and gzipped JSONL import | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-041 🗣️ | Map ordered senses, POS, examples, IPA, forms and relations | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-042 🇪🇸 | Separate headword/definition language for English/Spanish editions | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-040 🌐 | Streaming JSONL and gzipped JSONL import | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
+| LEX-041 🗣️ | Map ordered senses, POS, examples, IPA, forms and relations | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
+| LEX-042 🇪🇸 | Separate headword/definition language for English/Spanish editions | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-043 💽 | Large import progress, cancellation, space and deduplication | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
 | LEX-044 🔬 | Real-record semantic checks and incomplete data cases | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
 
@@ -206,3 +206,5 @@ Excluded: online server/account, telemetry, web/mobile app, automatic OS package
 - 2026-11-10: Added bounded dictzip version-1 `RA` gzip-extra-header and random-access raw-DEFLATE decoder, retaining read-only source files. Added a generated, gzip-valid synthetic `.dict.dz` fixture with reads across chunks, invalid RA tests, and SQLite import integration. [CI 42835023624](https://github.com/sguzman/lexiva/actions/runs/42835023624) passed fmt/check/Clippy and 33 tests (0 failed). LEX-032 verified. Authentic FreeDict cross-check, content metadata and full gzip CRC checking remain pending.
 
 - 2026-11-10: Added DICT `00-database-*` administrative record extraction, source/format provenance, conservative FreeDict ISO639-3 filename mapping (e.g. spa→es, eng→en), verbatim articles and cautiously recognized POS abbreviations. No guessed data license. Installed Ubuntu 24.04 `dict-freedict-spa-eng` and `dict-freedict-eng-spa` in CI and cross-checked **every indexed lexical article** against independent `gzip -dc` output, then imported both sources into SQLite/FTS5. [CI 42838302466](https://github.com/sguzman/lexiva/actions/runs/42838302466) passed fmt/check/Clippy, 36 unit tests and 1 real package test: spa-eng 4,507 records (193,471 uncompressed bytes), eng-spa 5,912 records (204,192 bytes). LEX-033/034 verified. M03 complete. This does not count as user-machine Arch or GUI QA.
+
+- 2026-11-10: Implemented edition-explicit Wiktextract `.jsonl` and `.jsonl.gz` streaming adapter, BCP-47-shaped word language filter, ordered sense/gloss labels, examples and translations, pronunciation, inflection, etymology, relations, and full raw structured record provenance. Bounded 2 MiB input records integrate with existing 128-record staged SQLite publisher. [CI 42845015317](https://github.com/sguzman/lexiva/actions/runs/42845015317) passed fmt/check/Clippy, 45 regular unit tests and 1 FreeDict package test. LEX-040/041/042 verified on documented-shape synthetic inputs; LEX-043/044 remain pending for actual large Wiktionary dumps, semantic variants and measured resource usage.
