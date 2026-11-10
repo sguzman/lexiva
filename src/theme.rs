@@ -216,6 +216,8 @@ mod tests {
         use std::os::unix::net::UnixStream;
         use std::time::{Duration, Instant};
 
+        use eframe::egui;
+
         use super::DarkmanWatcher;
 
         let (client, mut server) = UnixStream::pair().unwrap();
