@@ -2,7 +2,7 @@
 
 **Lexiva** is a native, offline-first dictionary reader for Linux built with Rust and [egui/eframe](https://github.com/emilk/egui). It aims to make installed Arch dictionaries and open lexical datasets readable in a fast, elegant interface.
 
-> **Status: native shell plus tested lexical storage foundation.** Source-aware SQLite/FTS5, staged bounded imports, atomic publication, and schema-v2 migration have passed 24 automated tests. Actual dictionary file adapters, reader/search GUI integration, and native Hyprland QA are not yet finished.
+> **Status: native shell, verified storage and early GNU DICT reader.** A source-scoped SQLite/FTS5 index and transactional imports are tested; uncompressed GNU DICT `.index`/`.dict` parsing now passes synthetic fixtures (30 tests overall). Typical compressed `.dict.dz` packages, GUI search/reader integration, actual installed-dictionary cross-checks and Hyprland QA remain unfinished.
 
 ## Planned features
 
@@ -24,6 +24,7 @@ The source builds against Rust 1.95.0. To inspect the early native shell from a 
 - [SQLite schema and storage limitations](docs/STORAGE.md)
 - [Dependencies, licensing and risks](docs/DEPENDENCIES.md)
 - [Source formats](docs/FORMATS.md)
+- [GNU DICT adapter status and limits](docs/DICT.md)
 - [Testing and release acceptance](docs/TESTING.md)
 
 ## Visual identity

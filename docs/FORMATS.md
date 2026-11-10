@@ -11,3 +11,7 @@
 | MDict / DSL / SLOB / ZIM | Excluded | Requires separate qualification and explicit scope decision. |
 
 Recognizing a file extension alone is not compatibility. A supported source must pass real-entry cross-checks, preserve provenance and report unsupported data faithfully. Dictionary content licenses differ from Lexiva's MIT source; nothing is redistributed by default.
+
+## Implemented status — GNU DICT (November 2026)
+
+The adapter in `src/dict.rs` can discover matching `.index` + `.dict` or `.dict.dz` files in `/usr/share/dictd`, `/usr/local/share/dictd` or user-supplied directories **without a dictd server**. Only **uncompressed** `.dict` payloads are readable today; `.dict.dz` pairs are detected but correctly return an unsupported-format error. Synthetic `.index`/`.dict` fixtures pass base-64 offset, UTF-8, homograph, corruption and transactional-import tests. No actual FreeDict package data has yet been cross-checked. See [GNU DICT adapter notes](DICT.md).

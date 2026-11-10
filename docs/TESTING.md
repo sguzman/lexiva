@@ -31,3 +31,7 @@ All applicable automated and on-device tests pass, packaging and installation pa
 ## Schema v2 and staged-import checkpoint
 
 [Run 42751965002](https://github.com/sguzman/lexiva/actions/runs/42751965002) verified formatting, Rust compilation, strict Clippy and **24 tests passing**. The tests cover transactional staged publishing, cancellation, empty and duplicate imports, on-disk abandoned staging across reopen, deliberate stage discard, v1→v2 migration, FTS rebuild, old-data preservation, invalid database file refusal and a 4 MiB input-record guard. These use synthetic fixtures; **real dictionary file ingestion and native GUI runtime validation remain pending**.
+
+## DICT reader and source discovery checkpoint
+
+[Run 42832705560](https://github.com/sguzman/lexiva/actions/runs/42832705560) passed **30 tests / 0 failures**, fmt/check/strict Clippy, including six new synthetic GNU DICT cases: offset/length alphabet and overflow, deterministic directory discovery, unicode headwords plus homographs, malformed and oversized indexes, and end-to-end source-scoped SQLite import of plain `.dict`. The tests **do not** prove compressed dictzip `.dict.dz` support or that an actual FreeDict package from the Arch repositories imports correctly; those remain M03 work.
