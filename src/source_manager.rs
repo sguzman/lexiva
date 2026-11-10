@@ -28,6 +28,7 @@ pub struct DiscoveredDict {
 enum Command {
     Scan(Option<PathBuf>),
     ImportDict(Box<DiscoveredDict>),
+    Remove(String),
     ImportJsonl {
         path: PathBuf,
         edition: WiktionaryEdition,
@@ -35,8 +36,22 @@ enum Command {
     },
 }
 
+#[derive(Clone, Debug)]
+pub enum ManagerChange {
+    Imported(String),
+    Removed(String),
+}
+
+#[derive(Clone, Debug)]
+struct IndexedSource {
+    source: DictionarySource,
+    count: i64,
+}
+
 enum Event {
     Found(Vec<DiscoveredDict>),
+    Catalog(Vec<IndexedSource>),
+    Removed(String),
     Progress(usize),
     Imported { source_id: String, count: usize },
     Error(String),
@@ -85,6 +100,20 @@ fn scan(store: &DictionaryStore, directory: Option<&Path>) -> Result<Vec<Discove
                 files,
                 indexed_entries,
             })
+        })
+        .collect()
+}
+
+fn indexed_catalog(store: &DictionaryStore) -> Result<Vec<IndexedSource>, String> {
+    store
+        .list_sources()
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .map(|source| {
+            let count = store
+                .count_entries(&source.id)
+                .map_err(|error| error.to_string())?;
+            Ok(IndexedSource { source, count })
         })
         .collect()
 }
@@ -157,6 +186,7 @@ pub struct SourceManager {
     events: Receiver<Event>,
     cancel: Arc<AtomicBool>,
     pub discovered: Vec<DiscoveredDict>,
+    indexed: Vec<IndexedSource>,
     directory: String,
     jsonl_path: String,
     edition: WiktionaryEdition,
@@ -184,6 +214,10 @@ impl SourceManager {
                         return;
                     }
                 };
+                if let Ok(indexed) = indexed_catalog(&store) {
+                    let _ = outgoing.send(Event::Catalog(indexed));
+                    context.request_repaint();
+                }
                 while let Ok(command) = incoming.recv() {
                     let result = match command {
                         Command::Scan(path) => match scan(&store, path.as_deref()) {
@@ -197,6 +231,15 @@ impl SourceManager {
                             import_dict(&mut store, &candidate, &worker_cancel, &outgoing)
                                 .map(|count| Some((candidate.source.id, count)))
                         }
+                        Command::Remove(id) => store
+                            .remove_source(&id)
+                            .map_err(|error| error.to_string())
+                            .map(|removed| {
+                                if removed {
+                                    let _ = outgoing.send(Event::Removed(id));
+                                }
+                                None
+                            }),
                         Command::ImportJsonl {
                             path,
                             edition,
@@ -220,6 +263,9 @@ impl SourceManager {
                             let _ = outgoing.send(Event::Error(message));
                         }
                     }
+                    if let Ok(indexed) = indexed_catalog(&store) {
+                        let _ = outgoing.send(Event::Catalog(indexed));
+                    }
                     context.request_repaint();
                 }
             })?;
@@ -228,6 +274,7 @@ impl SourceManager {
             events,
             cancel,
             discovered: Vec::new(),
+            indexed: Vec::new(),
             directory: String::new(),
             jsonl_path: String::new(),
             edition: WiktionaryEdition::English,
@@ -256,10 +303,23 @@ impl SourceManager {
     }
 
     /// Returns a new indexed source ID so the search worker can refresh.
-    pub fn poll(&mut self) -> Option<String> {
-        let mut imported = None;
+    pub fn poll(&mut self) -> Option<ManagerChange> {
+        let mut changed = None;
         while let Ok(event) = self.events.try_recv() {
             match event {
+                Event::Catalog(indexed) => {
+                    self.indexed = indexed;
+                }
+                Event::Removed(id) => {
+                    self.busy = false;
+                    self.status = "Removed local index; dictionary files are unchanged.".into();
+                    for candidate in &mut self.discovered {
+                        if candidate.source.id == id {
+                            candidate.indexed_entries = 0;
+                        }
+                    }
+                    changed = Some(ManagerChange::Removed(id));
+                }
                 Event::Found(found) => {
                     self.discovered = found;
                     self.busy = false;
@@ -276,7 +336,7 @@ impl SourceManager {
                             candidate.indexed_entries = count as i64;
                         }
                     }
-                    imported = Some(source_id);
+                    changed = Some(ManagerChange::Imported(source_id));
                 }
                 Event::Error(message) => {
                     self.busy = false;
@@ -284,7 +344,7 @@ impl SourceManager {
                 }
             }
         }
-        imported
+        changed
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) {
@@ -328,6 +388,27 @@ impl SourceManager {
                         }
                     });
                     ui.small(candidate.files.index.display().to_string());
+                }
+                ui.separator();
+                ui.strong("Indexed dictionary sources");
+                for item in self.indexed.clone() {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(format!("{} · {} entries", item.source.title, item.count));
+                        let missing = item
+                            .source
+                            .origin
+                            .as_ref()
+                            .is_some_and(|path| !Path::new(path).exists());
+                        if missing {
+                            ui.weak("Source file missing; local index remains available.");
+                        }
+                        if ui
+                            .add_enabled(!self.busy, egui::Button::new("Remove local index"))
+                            .clicked()
+                        {
+                            self.start(Command::Remove(item.source.id.clone()));
+                        }
+                    });
                 }
                 ui.separator();
                 ui.label("Import Wiktextract JSONL / JSONL.gz");
@@ -478,6 +559,15 @@ mod tests {
         assert!(import_dict(&mut store, &candidate, &cancel, &tx).is_err());
         assert_eq!(store.count_entries(&id).unwrap(), 1);
         assert_eq!(store.staged_count(&id).unwrap(), 0);
+
+        cancel.store(false, Ordering::Release);
+        assert!(store.remove_source(&id).unwrap());
+        assert_eq!(store.count_entries(&id).unwrap(), 0);
+        assert!(store
+            .search_ranked("casa", SearchFilters::default(), 10)
+            .unwrap()
+            .is_empty());
+        assert_eq!(store.count_entries(&json_id).unwrap(), 1);
 
         assert_eq!(fs::read(&index_path).unwrap(), original_index);
         assert_eq!(fs::read(&data_path).unwrap(), original_data);

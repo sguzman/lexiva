@@ -159,6 +159,16 @@ impl DictionaryStore {
         Ok(())
     }
 
+    /// Remove only the locally derived index and source registration.
+    /// SQLite's foreign-key cascade updates entries and their FTS triggers.
+    /// Installed source files are never deleted or modified.
+    pub fn remove_source(&mut self, source_id: &str) -> Result<bool> {
+        let tx = self.conn.transaction()?;
+        let removed = tx.execute("DELETE FROM dictionary_sources WHERE id = ?1", [source_id])?;
+        tx.commit()?;
+        Ok(removed > 0)
+    }
+
     pub fn get_source(&self, source_id: &str) -> Result<Option<DictionarySource>> {
         let json: Option<String> = self
             .conn

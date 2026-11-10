@@ -7,7 +7,7 @@ use eframe::egui;
 use crate::model::DictionarySource;
 use crate::reader;
 use crate::search_worker::{self, SearchScope, SearchWorker};
-use crate::source_manager::SourceManager;
+use crate::source_manager::{ManagerChange, SourceManager};
 use crate::storage::SearchHit;
 use crate::theme::{self, ThemeChoice};
 
@@ -226,9 +226,16 @@ impl LexivaApp {
 impl eframe::App for LexivaApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.receive_updates();
-        let indexed = self.manager.as_mut().and_then(SourceManager::poll);
-        if let Some(id) = indexed {
-            self.scope = SearchScope::Source(id);
+        let changed = self.manager.as_mut().and_then(SourceManager::poll);
+        if let Some(change) = changed {
+            match change {
+                ManagerChange::Imported(id) => self.scope = SearchScope::Source(id),
+                ManagerChange::Removed(id) => {
+                    if self.scope == SearchScope::Source(id) {
+                        self.scope = SearchScope::Unselected;
+                    }
+                }
+            }
             self.dispatch_search();
         }
 
