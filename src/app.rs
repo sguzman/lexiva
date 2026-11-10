@@ -49,6 +49,16 @@ fn lookup_shortcuts_allowed(
     window_focused && focused_widget.is_none_or(|id| id == lookup_widget)
 }
 
+/// ScrollAreas nested inside a full-page ScrollArea need an explicit viewport
+/// height. Without one, a long results list can swallow page scrolling and
+/// leave the selected definition below the visible window.
+fn result_pane_height(viewport_height: f32) -> f32 {
+    if !viewport_height.is_finite() || viewport_height <= 0.0 {
+        return 340.0;
+    }
+    (viewport_height * 0.62).clamp(260.0, 620.0)
+}
+
 #[derive(Default)]
 struct SearchHistory {
     queries: Vec<String>,
@@ -110,6 +120,7 @@ pub struct LexivaApp {
     suggestions: Vec<String>,
     history: SearchHistory,
     selected: Option<EntryKey>,
+    reader_window_open: bool,
     error: Option<String>,
 }
 
@@ -207,6 +218,7 @@ impl LexivaApp {
             suggestions: Vec::new(),
             history: SearchHistory::default(),
             selected: None,
+            reader_window_open: false,
             error,
         };
         app.dispatch_search();
@@ -629,12 +641,18 @@ impl LexivaApp {
         }
 
         ui.add_space(10.0);
+        // This is based on the physical viewport, NOT ui.available_height():
+        // inside the page ScrollArea that value can be effectively unbounded.
+        let pane_height = result_pane_height(ui.ctx().content_rect().height());
         ui.columns(2, |columns| {
             columns[0].heading(format!("Results ({})", self.hits.len()));
             columns[0].add_space(4.0);
             let mut clicked = None;
             egui::ScrollArea::vertical()
                 .id_salt("lexiva_result_list")
+                .max_height(pane_height)
+                .min_scrolled_height(pane_height)
+                .auto_shrink([false, false])
                 .show(&mut columns[0], |ui| {
                     for hit in &self.hits {
                         let is_selected =
@@ -658,10 +676,24 @@ impl LexivaApp {
             if let Some(clicked) = clicked {
                 self.selected = Some(clicked);
             }
-            columns[1].heading("Definition");
+            columns[1].horizontal(|ui| {
+                ui.heading("Definition");
+                if ui.small_button("Open full reader").clicked() {
+                    self.reader_window_open = true;
+                }
+            });
             columns[1].add_space(4.0);
+            // A separate ID per selected source/entry makes a newly selected
+            // word start at the top instead of inheriting the last scroll.
+            let selected_id = self
+                .selected
+                .as_ref()
+                .map(|key| (&key.source_id, &key.entry_id));
             egui::ScrollArea::vertical()
-                .id_salt("lexiva_definition_reader")
+                .id_salt(("lexiva_definition_reader", selected_id))
+                .max_height(pane_height)
+                .min_scrolled_height(pane_height)
+                .auto_shrink([false, false])
                 .show(&mut columns[1], |ui| {
                     let selected = self
                         .selected
@@ -674,6 +706,30 @@ impl LexivaApp {
                     }
                 });
         });
+
+        // The full reader is another independently scrollable surface,
+        // accessible even if the main window is too short for two columns.
+        if self.reader_window_open {
+            let mut open = true;
+            if let Some(hit) = self
+                .selected
+                .as_ref()
+                .and_then(|key| self.hits.iter().find(|hit| key.matches(hit)))
+            {
+                egui::Window::new(format!("{} — Lexiva", hit.entry.lemma))
+                    .open(&mut open)
+                    .resizable(true)
+                    .default_size(egui::vec2(650.0, 480.0))
+                    .min_width(320.0)
+                    .vscroll(true)
+                    .show(ui.ctx(), |ui| {
+                        reader::show(ui, hit, self.reader_scale);
+                    });
+            } else {
+                open = false;
+            }
+            self.reader_window_open = open;
+        }
     }
 }
 
@@ -715,6 +771,30 @@ impl eframe::App for LexivaApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reader_panes_have_bounded_scrollable_viewports() {
+        assert_eq!(result_pane_height(500.0), 310.0);
+        assert_eq!(result_pane_height(720.0), 446.4);
+        assert_eq!(result_pane_height(2_000.0), 620.0);
+        assert_eq!(result_pane_height(f32::INFINITY), 340.0);
+
+        egui::__run_test_ui(|ui| {
+            let height = result_pane_height(500.0);
+            let area = egui::ScrollArea::vertical()
+                .id_salt("bounded_reader_test")
+                .max_height(height)
+                .min_scrolled_height(height)
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    for _ in 0..100 {
+                        ui.label("Long dictionary definition with many senses");
+                    }
+                });
+            assert!(area.inner_rect.height() <= height + 1.0);
+            assert!(area.content_size.y > area.inner_rect.height());
+        });
+    }
 
     #[test]
     fn lookup_navigation_does_not_capture_other_controls_or_background_windows() {
