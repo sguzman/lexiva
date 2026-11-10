@@ -394,6 +394,96 @@ mod tests {
     use super::*;
 
     #[test]
+    fn explicit_dict_and_jsonl_imports_publish_to_catalog_without_editing_files() {
+        use std::fs;
+        use std::sync::atomic::AtomicUsize;
+
+        use crate::storage::SearchFilters;
+
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let index = NEXT.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "lexiva-manager-test-{}-{index}",
+            std::process::id()
+        ));
+        fs::create_dir(&root).unwrap();
+        let index_path = root.join("freedict-spa-eng.index");
+        let data_path = root.join("freedict-spa-eng.dict");
+        let jsonl_path = root.join("raw.jsonl");
+        let original_index = b"casa\tA\tF\n";
+        let original_data = b"home\n";
+        let original_jsonl =
+            b"{\"word\":\"hogar\",\"lang_code\":\"es\",\"pos\":\"noun\",\"senses\":[{\"glosses\":[\"A home\"]}]}\n";
+        fs::write(&index_path, original_index).unwrap();
+        fs::write(&data_path, original_data).unwrap();
+        fs::write(&jsonl_path, original_jsonl).unwrap();
+
+        let mut store = DictionaryStore::open(&root.join("catalog.sqlite")).unwrap();
+        let files = DictFiles {
+            index: index_path.clone(),
+            data: data_path.clone(),
+            compressed: false,
+        };
+        let id = stable_source_id("dict", &index_path, "");
+        let source = dict::metadata::source_from_files(&files, &id).unwrap();
+        let candidate = DiscoveredDict {
+            source,
+            files,
+            indexed_entries: 0,
+        };
+        let (tx, rx) = mpsc::channel();
+        let cancel = AtomicBool::new(false);
+        assert_eq!(import_dict(&mut store, &candidate, &cancel, &tx).unwrap(), 1);
+        assert_eq!(store.count_entries(&id).unwrap(), 1);
+        assert_eq!(
+            store.get_entry(&id, "index-line:1").unwrap().unwrap().lemma,
+            "casa"
+        );
+        assert_eq!(
+            store
+                .search_ranked(
+                    "cas",
+                    SearchFilters {
+                        source_id: Some(&id),
+                        ..SearchFilters::default()
+                    },
+                    10
+                )
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(matches!(rx.try_recv(), Ok(Event::Progress(1))));
+
+        let (json_id, count) = import_jsonl(
+            &mut store,
+            &jsonl_path,
+            WiktionaryEdition::English,
+            Some("es"),
+            &cancel,
+            &tx,
+        )
+        .unwrap();
+        assert_eq!(count, 1);
+        let json_entry = store.get_entry(&json_id, "jsonl-line:1").unwrap().unwrap();
+        assert_eq!(json_entry.lemma, "hogar");
+        assert_eq!(json_entry.definition_language.as_deref(), Some("en"));
+
+        // An immediately cancelled reindex must leave the last published
+        // record available, with no staging rows leaked.
+        cancel.store(true, Ordering::Release);
+        assert!(import_dict(&mut store, &candidate, &cancel, &tx).is_err());
+        assert_eq!(store.count_entries(&id).unwrap(), 1);
+        assert_eq!(store.staged_count(&id).unwrap(), 0);
+
+        assert_eq!(fs::read(&index_path).unwrap(), original_index);
+        assert_eq!(fs::read(&data_path).unwrap(), original_data);
+        assert_eq!(fs::read(&jsonl_path).unwrap(), original_jsonl);
+        drop(store);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn stable_source_ids_separate_paths_edition_and_filter() {
         let first = stable_source_id("dict", Path::new("/usr/share/dictd/a.index"), "");
         assert_eq!(

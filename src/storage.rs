@@ -3,6 +3,7 @@
 
 use std::fmt;
 use std::path::Path;
+use std::time::Duration;
 
 use rusqlite::{Connection, OptionalExtension, params};
 
@@ -84,6 +85,9 @@ impl DictionaryStore {
     }
 
     fn initialize(conn: Connection) -> Result<Self> {
+        // The GUI search and source-import workers use different SQLite
+        // connections; short writers should not cause spurious lock errors.
+        conn.busy_timeout(Duration::from_secs(5))?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
         // Avoid changing a database that is corrupt or from a future version.
