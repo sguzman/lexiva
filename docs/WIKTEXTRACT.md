@@ -1,6 +1,6 @@
 # Wiktextract / Kaikki import — implemented adapter and limits
 
-**Status:** LEX-040, LEX-041 and LEX-042 verified against nine synthetic, upstream-schema-shaped tests. Actual downloaded Wiktionary records and corpus-scale benchmarks are **not yet verified** (LEX-043/044).
+**Status:** M04's five roadmap tasks (LEX-040–044) have passed scoped CI acceptance, including original authentic Kaikki per-word JSONL and a 150,000-record generated compressed stress workload. **This does not establish compatibility or performance across a complete 24.8GB Wiktionary raw dump.**
 
 ## Source and edition are not the same as word language
 
@@ -20,7 +20,7 @@ Lexiva never assigns a meaning language based on a headword's spelling or filena
 - Each decompressed input line has a **2 MiB** cap; oversized/corrupt lines stop import safely. A source's **4 MiB serialized-entry** guard still applies at SQLite staging.
 - The existing import engine accepts up to **128** mapped records per committed staging batch, with cancellation checks and progress counts for selected entries. A failed or interrupted import cannot replace the previously published source.
 - Language filtering occurs during streaming: when `es` is selected, records belonging to other languages are skipped. Every accepted record retains a stable source-local line-number identifier; homographs/POS splits are not collapsed.
-- Very large imports also need disk-space preflight, UI progress/error feedback, resource measurement and compatibility with unusually large records before the full 24+ GiB English-edition raw dump should be considered accepted. All of this is LEX-043 and still pending.
+- A dedicated CI stress test now measures memory and database growth using 150,000 generated JSONL records, including cancellation and reimport of 120,000 accepted Spanish entries. **Preflight for genuinely insufficient disk space, user-facing import progress, and full 24+ GiB raw dump performance remain unfinished** and are tracked as later GUI/hardening and acceptance concerns.
 
 ## Structured mapping
 
@@ -42,6 +42,24 @@ Format references:
 
 ## Verification evidence
 
-[CI run 42845015317](https://github.com/sguzman/lexiva/actions/runs/42845015317) passed 45 regular tests (9 new Wiktextract), 1 real FreeDict package test, formatting, compilation, Clippy. Tests include English-edition Spanish words with English definitions, Spanish-edition Spanish words with Spanish definitions, ordered senses, raw metadata round-trip, gzip equivalence, 400-record staged import, incorrect edition refusal, 2 MiB line rejection and transactional rollback.
+[CI run 42855279348](https://github.com/sguzman/lexiva/actions/runs/42855279348) passed formatting, Rust compilation, strict Clippy, **45 regular tests plus 4 targeted tests (0 failures)**:
+- A real installed FreeDict regression in both language directions;
+- An isolated 150,000-line, compressed Wiktextract stress test (120,000 Spanish headwords indexed, source filtering and accurate staged progress; cancellation followed by atomic reimport);
+- Two raw, independently parsed Wiktextract **Kaikki.org per-word downloads**: [English-edition Spanish `casás`](https://kaikki.org/dictionary/Spanish/meaning/c/ca/cas%C3%A1s.html) (1 record, 606 bytes) and [Spanish-edition Spanish `caso`](https://kaikki.org/eswiktionary/Espa%C3%B1ol/meaning/c/ca/caso.html) (2 records, 9,056 bytes). Their original parsed JSON values were compared against the importer's preserved record metadata, sense order and POS, then searched in SQLite.
 
-**Pending:** LEX-043 (large import/progress/cancel/resource evaluation), LEX-044 (authentic extract records/semantic variants). GUI dictionary management and reading are separate M05/M06 work.
+#### Measured stress-run metrics
+
+| Metric | CI measurement |
+| --- | ---: |
+| Generated entries | 150,000 |
+| Selected Spanish entries | 120,000 |
+| Gzip source size | 2,070,248 bytes |
+| SQLite after initial publication | 266,715,136 bytes |
+| SQLite after full reimport | 266,797,056 bytes |
+| Process peak resident memory (Linux VmHWM) | 15,132 KiB |
+| Initial import duration | 23.37 seconds |
+| Full reimport duration | 24.13 seconds |
+
+These figures are **one GitHub-hosted Ubuntu runner measurement**, not a speed promise for other hardware. The test generated the input incrementally, kept an existing source searchable when cancellation interrupted a staged replacement, and verified no duplicate count/FTS damage after reimport.
+
+**M04 is verified complete to its defined tests.** Full-scale dumps, unsupported edition variations, disk-space preflight, GUI import experience, native Arch/Hyprland execution and detailed throughput benchmarks remain outstanding in later milestones.
