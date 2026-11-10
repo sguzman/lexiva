@@ -59,10 +59,14 @@ mod tests {
     #[test]
     fn v2_migration_preserves_published_entries_and_default_preferences() {
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(include_str!("../schema_v1.sql")).unwrap();
-        let payload = serde_json::to_string(&source()).unwrap();
-        conn.execute("INSERT INTO dictionary_sources (id, payload) VALUES ('legacy', ?1)", [payload])
+        conn.execute_batch(include_str!("../schema_v1.sql"))
             .unwrap();
+        let payload = serde_json::to_string(&source()).unwrap();
+        conn.execute(
+            "INSERT INTO dictionary_sources (id, payload) VALUES ('legacy', ?1)",
+            [payload],
+        )
+        .unwrap();
         conn.execute_batch(include_str!("../migration_v1_to_v2.sql"))
             .unwrap();
         let store = DictionaryStore::initialize(conn).unwrap();

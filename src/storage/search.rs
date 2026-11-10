@@ -522,10 +522,8 @@ mod tests {
         use std::sync::atomic::{AtomicUsize, Ordering};
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let i = NEXT.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "lexiva-prefs-{}-{i}.sqlite",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("lexiva-prefs-{}-{i}.sqlite", std::process::id()));
         let mut store = DictionaryStore::open(&path).unwrap();
         store.upsert_source(&source("a", "en")).unwrap();
         store.upsert_source(&source("b", "en")).unwrap();
@@ -540,19 +538,40 @@ mod tests {
         assert!(store.move_source("b", -1).unwrap());
         assert_eq!(store.list_source_settings().unwrap()[0].source.id, "b");
         assert_eq!(
-            store.search_ranked("casa", SearchFilters::default(), 10)
-                .unwrap()[0].entry.source_id,
+            store
+                .search_ranked("casa", SearchFilters::default(), 10)
+                .unwrap()[0]
+                .entry
+                .source_id,
             "b"
         );
         store.set_source_enabled("a", false).unwrap();
-        assert!(store.search_ranked("casa", SearchFilters {
-            source_id: Some("a"),
-            ..Default::default()
-        }, 10).unwrap().is_empty());
-        assert!(store.suggest_words("casaa", SearchFilters {
-            source_id: Some("a"),
-            ..Default::default()
-        }, 8).unwrap().is_empty());
+        assert!(
+            store
+                .search_ranked(
+                    "casa",
+                    SearchFilters {
+                        source_id: Some("a"),
+                        ..Default::default()
+                    },
+                    10
+                )
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .suggest_words(
+                    "casaa",
+                    SearchFilters {
+                        source_id: Some("a"),
+                        ..Default::default()
+                    },
+                    8
+                )
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(store.list_enabled_sources().unwrap().len(), 1);
         assert!(!store.move_source("b", -1).unwrap());
         assert!(store.set_source_enabled("missing", true).is_err());
