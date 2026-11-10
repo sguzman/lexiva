@@ -18,6 +18,7 @@ const HEADWORD_LANGUAGE_KEY: &str = "lexiva.headword_language.v1";
 const DEFINITION_LANGUAGE_KEY: &str = "lexiva.definition_language.v1";
 const INTERFACE_SCALE_KEY: &str = "lexiva.interface_scale.v1";
 const REDUCED_MOTION_KEY: &str = "lexiva.reduced_motion.v1";
+const HIGH_CONTRAST_KEY: &str = "lexiva.high_contrast.v1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct EntryKey {
@@ -95,6 +96,7 @@ pub struct LexivaApp {
     reader_scale: f32,
     interface_scale: f32,
     reduced_motion: bool,
+    high_contrast: bool,
     query: String,
     headword_language: String,
     definition_language: String,
@@ -113,7 +115,12 @@ pub struct LexivaApp {
 
 impl LexivaApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        theme::configure_palette(&cc.egui_ctx);
+        let high_contrast = theme::high_contrast_from_storage(
+            cc.storage
+                .and_then(|storage| storage.get_string(HIGH_CONTRAST_KEY))
+                .as_deref(),
+        );
+        theme::configure_palette(&cc.egui_ctx, high_contrast);
         theme::configure_system_font(&cc.egui_ctx);
         let interface_scale = theme::interface_scale_from_storage(
             cc.storage
@@ -186,6 +193,7 @@ impl LexivaApp {
             reader_scale,
             interface_scale,
             reduced_motion,
+            high_contrast,
             query: String::new(),
             headword_language,
             definition_language,
@@ -383,6 +391,12 @@ impl eframe::App for LexivaApp {
                         .changed()
                     {
                         theme::configure_motion(ui.ctx(), self.reduced_motion);
+                    }
+                    if ui
+                        .checkbox(&mut self.high_contrast, "High-contrast text")
+                        .changed()
+                    {
+                        theme::configure_palette(ui.ctx(), self.high_contrast);
                     }
                     ui.label("Ctrl+Plus/Minus/0 also adjusts interface zoom.");
                 });
@@ -610,6 +624,7 @@ impl eframe::App for LexivaApp {
         storage.set_string(DEFINITION_LANGUAGE_KEY, self.definition_language.clone());
         storage.set_string(INTERFACE_SCALE_KEY, format!("{:.2}", self.interface_scale));
         storage.set_string(REDUCED_MOTION_KEY, self.reduced_motion.to_string());
+        storage.set_string(HIGH_CONTRAST_KEY, self.high_contrast.to_string());
     }
 }
 

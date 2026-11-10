@@ -150,6 +150,10 @@ pub fn reduced_motion_from_storage(value: Option<&str>) -> bool {
     value == Some("true")
 }
 
+pub fn high_contrast_from_storage(value: Option<&str>) -> bool {
+    value == Some("true")
+}
+
 /// Applies to light and dark styles, including theme transitions.
 /// No animation timer is started while reduction is enabled.
 pub fn configure_motion(ctx: &egui::Context, reduced_motion: bool) {
@@ -207,23 +211,35 @@ pub fn configure_system_font(ctx: &egui::Context) {
 
 /// Identity colors derived from the Lexiva name (OKLCH hue 16°).
 /// Accessible contrast and external Hyprland theme changes require runtime QA.
-pub fn configure_palette(ctx: &egui::Context) {
+pub fn configure_palette(ctx: &egui::Context, high_contrast: bool) {
     let mut light = egui::Visuals::light();
     light.hyperlink_color = egui::Color32::from_rgb(156, 66, 75);
     light.selection.bg_fill = egui::Color32::from_rgb(156, 66, 75);
+    if high_contrast {
+        light.weak_text_color = Some(egui::Color32::from_rgb(55, 55, 55));
+        light.widgets.noninteractive.fg_stroke.color = egui::Color32::from_rgb(22, 22, 22);
+        light.widgets.inactive.fg_stroke.color = egui::Color32::from_rgb(22, 22, 22);
+        light.selection.stroke.color = egui::Color32::WHITE;
+    }
     ctx.set_visuals_of(egui::Theme::Light, light);
 
     let mut dark = egui::Visuals::dark();
     dark.hyperlink_color = egui::Color32::from_rgb(234, 151, 155);
     dark.selection.bg_fill = egui::Color32::from_rgb(156, 66, 75);
+    if high_contrast {
+        dark.weak_text_color = Some(egui::Color32::from_rgb(222, 222, 222));
+        dark.widgets.noninteractive.fg_stroke.color = egui::Color32::from_rgb(245, 245, 245);
+        dark.widgets.inactive.fg_stroke.color = egui::Color32::from_rgb(245, 245, 245);
+        dark.selection.stroke.color = egui::Color32::WHITE;
+    }
     ctx.set_visuals_of(egui::Theme::Dark, dark);
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        ThemeChoice, configure_motion, interface_scale_from_storage, reader_scale_from_storage,
-        reduced_motion_from_storage,
+        ThemeChoice, configure_motion, configure_palette, high_contrast_from_storage,
+        interface_scale_from_storage, reader_scale_from_storage, reduced_motion_from_storage,
     };
 
     #[test]
@@ -336,6 +352,45 @@ mod tests {
                 eframe::egui::Rangef::new(0.1, 0.3)
             );
         }
+    }
+
+    #[test]
+    fn high_contrast_preserves_both_identity_accents_and_readable_secondary_text() {
+        let ctx = eframe::egui::Context::default();
+        configure_palette(&ctx, true);
+        for mode in [eframe::egui::Theme::Light, eframe::egui::Theme::Dark] {
+            let style = ctx.style_of(mode);
+            let visuals = &style.visuals;
+            assert!(contrast(visuals.weak_text_color(), visuals.panel_fill) >= 4.5);
+            assert!(contrast(visuals.selection.stroke.color, visuals.selection.bg_fill) >= 4.5);
+        }
+        configure_palette(&ctx, false);
+        assert_eq!(
+            ctx.style_of(eframe::egui::Theme::Light)
+                .visuals
+                .weak_text_color,
+            None
+        );
+        assert!(high_contrast_from_storage(Some("true")));
+        assert!(!high_contrast_from_storage(Some("false")));
+        assert!(!high_contrast_from_storage(Some("garbled")));
+    }
+
+    fn contrast(a: eframe::egui::Color32, b: eframe::egui::Color32) -> f32 {
+        fn luminance(c: eframe::egui::Color32) -> f32 {
+            fn channel(value: u8) -> f32 {
+                let c = f32::from(value) / 255.0;
+                if c <= 0.04045 {
+                    c / 12.92
+                } else {
+                    ((c + 0.055) / 1.055).powf(2.4)
+                }
+            }
+            0.2126 * channel(c.r()) + 0.7152 * channel(c.g()) + 0.0722 * channel(c.b())
+        }
+        let l1 = luminance(a);
+        let l2 = luminance(b);
+        (l1.max(l2) + 0.05) / (l1.min(l2) + 0.05)
     }
 
     #[test]
