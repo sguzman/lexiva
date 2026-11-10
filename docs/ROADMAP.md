@@ -4,11 +4,11 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 
 ## Progress checkpoint
 
-- Verified: **27 / 100 weighted points (27%)**. Previous comparable checkpoint: 21%; this development round **+6 percentage points**, comprising M03 LEX-030 source discovery (+2) and LEX-031 plain GNU DICT parsing and import (+4). Compressed dictionary reading and real-source cross-checks remain pending.
-- Verified in [CI run 42832705560](https://github.com/sguzman/lexiva/actions/runs/42832705560): Rust 1.95.0 formatting, compilation, strict Clippy and **30/30 tests** (including six synthetic DICT reader/discovery tests). No real downloaded/installed FreeDict sample has been cross-checked; `.dict.dz` is identified but not decoded, and GUI/Hyprland QA and optimized performance remain pending.
+- Verified: **29 / 100 weighted points (29%)**. Previous comparable checkpoint: 27%; this development round **+2 percentage points** for M03 LEX-032 (bounded random-access dictzip v1 reading and transactional import). Real package and language/markup verification remain pending.
+- Verified in [CI run 42835023624](https://github.com/sguzman/lexiva/actions/runs/42835023624): Rust 1.95.0 formatting, compilation, strict Clippy and **33/33 tests**, including a valid gzip/RA fixture spanning compression chunks, malformed-header rejection and `.dict.dz` → SQLite search. Real downloaded/installed FreeDict, GUI/Hyprland and optimized performance QA remain outstanding.
 - Baseline commit: b0cb884657a22b3cf2ec91fa15f4765b94c3a605 on main before inception documentation.
 - Environment limitation: tool execution container currently has no Rust toolchain; actual build requires GitHub CI and user-machine QA.
-- Next: implement dictzip `.dict.dz` bounded random-access decoding (LEX-032), then source language/format metadata (LEX-033) and **actual package-installed FreeDict verification** (LEX-034). Native GUI smoke/Hyprland verification (LEX-011) is still outstanding.
+- Next: preserve accurate FreeDict language direction, administrative metadata and article formatting (LEX-033), then cross-check **actual package-installed FreeDict data** (LEX-034). Native GUI smoke/Hyprland verification (LEX-011) is still outstanding.
 
 ## Milestones
 
@@ -17,7 +17,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M00 🧭 Inception & engineering contracts | 5 | 5 | verified complete |
 | M01 🦀 Rust bootstrap | 6 | 5 | active |
 | M02 🗃️ Lexical data & search foundation | 11 | 11 | verified complete |
-| M03 📚 GNU DICT / Arch integration | 12 | 6 | active |
+| M03 📚 GNU DICT / Arch integration | 12 | 8 | active |
 | M04 🌍 Wiktionary integration | 14 | 0 | pending |
 | M05 🔎 Search & reader | 13 | 0 | pending |
 | M06 🧰 Dictionary & language management | 8 | 0 | pending |
@@ -26,7 +26,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M09 🛡️ Hardening/performance | 6 | 0 | pending |
 | M10 📦 Documentation & distribution | 4 | 0 | pending |
 | M11 ✅ Acceptance & release | 3 | 0 | pending |
-| **Total** | **100** | **27** | **active** |
+| **Total** | **100** | **29** | **active** |
 
 ### M00 🧭 Inception & engineering contracts
 
@@ -70,7 +70,7 @@ Dependency: M02; weight: 12 points.
 |---|---|---:|---|---|
 | LEX-030 📂 | Discover standard Arch dictionaries and user directories | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-031 📖 | Parse DICT index, article offsets, lengths and multiple records | 4 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
-| LEX-032 🗜️ | Random-access dictzip with error and size bounds | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-032 🗜️ | Random-access dictzip with error and size bounds | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-033 🏷️ | Language metadata, homographs and source formatting | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
 | LEX-034 🧪 | Real FreeDict/DICT package cross-check and edge fixtures | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
 
@@ -202,3 +202,5 @@ Excluded: online server/account, telemetry, web/mobile app, automatic OS package
 - 2026-11-09 / 2026-11-10 UTC: Schema v2 staging/atomic publication and v1→v2 migration were implemented and tested; [CI 42751965002](https://github.com/sguzman/lexiva/actions/runs/42751965002) passed 24 tests, fmt/check/strict Clippy. Cancellation, duplicate rejection, source isolation, 128-record batching, 4 MiB per-record safeguards, on-disk abandoned staging, non-destructive corruption refusal and FTS rebuild tested. LEX-023 and LEX-024 verified; M02 completed. No real dictionary importer or GUI runtime validated yet.
 
 - 2026-11-10: Implemented read-only Arch/system and user-directory GNU DICT discovery plus `.index`/plain `.dict` streaming reader with overflow/size guards, administrative entry exclusion and source-attributed output into staged SQLite imports. CI [42832705560](https://github.com/sguzman/lexiva/actions/runs/42832705560) passed 30 tests (6 new), fmt/check/Clippy. LEX-030/031 verified on synthetic fixtures. Compressed `.dict.dz`, real installed FreeDict QA and language/markup interpretation are not yet complete.
+
+- 2026-11-10: Added bounded dictzip version-1 `RA` gzip-extra-header and random-access raw-DEFLATE decoder, retaining read-only source files. Added a generated, gzip-valid synthetic `.dict.dz` fixture with reads across chunks, invalid RA tests, and SQLite import integration. [CI 42835023624](https://github.com/sguzman/lexiva/actions/runs/42835023624) passed fmt/check/Clippy and 33 tests (0 failed). LEX-032 verified. Authentic FreeDict cross-check, content metadata and full gzip CRC checking remain pending.

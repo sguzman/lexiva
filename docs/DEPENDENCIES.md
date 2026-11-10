@@ -7,6 +7,7 @@ Reviewed at the first backend addition (2026-11-09). This is an inception-level 
 | Crate | Purpose | Published terms and toolchain | Decision / operational cost |
 | --- | --- | --- | --- |
 | [eframe 0.37.0](https://docs.rs/crate/eframe/0.37.0) | Native egui UI, input and persistence | MIT OR Apache-2.0; crate declares Rust 1.95 | Keep native Linux target and pinned version. Significant GPU/windowing dependency tree; actual Hyprland runtime validation remains required. |
+| [flate2 1.1.11](https://docs.rs/crate/flate2/1.1.11) | Raw DEFLATE decompression for dictzip v1 random access | MIT OR Apache-2.0; default Rust backend available | Direct, locked dependency already present transitively; chunk-bounded decoding, no external `dictzip` executable or server required. |
 | [rusqlite 0.41.1](https://docs.rs/crate/rusqlite/0.41.1) | SQLite transactions and FTS5 index | MIT; crate declares Rust 1.89. SQLite is public domain. | Use **bundled** SQLite for predictable FTS5 and no requirement for a system SQLite service; native C compilation is required. Do not use SQLCipher. |
 | [serde 1.0](https://serde.rs/derive.html) | Typed model serialization | MIT OR Apache-2.0 | Keep original source metadata in explicitly typed fields plus a JSON value. |
 | [serde_json 1.0](https://docs.rs/serde_json/latest/serde_json/) | Portable entry payload serialization | MIT OR Apache-2.0 | Treat arbitrary untrusted JSON as bounded import input. Typed round-tripping is not byte-for-byte preservation of original JSON syntax. |

@@ -35,3 +35,7 @@ All applicable automated and on-device tests pass, packaging and installation pa
 ## DICT reader and source discovery checkpoint
 
 [Run 42832705560](https://github.com/sguzman/lexiva/actions/runs/42832705560) passed **30 tests / 0 failures**, fmt/check/strict Clippy, including six new synthetic GNU DICT cases: offset/length alphabet and overflow, deterministic directory discovery, unicode headwords plus homographs, malformed and oversized indexes, and end-to-end source-scoped SQLite import of plain `.dict`. The tests **do not** prove compressed dictzip `.dict.dz` support or that an actual FreeDict package from the Arch repositories imports correctly; those remain M03 work.
+
+## Dictzip version-1 verification
+
+[Run 42835023624](https://github.com/sguzman/lexiva/actions/runs/42835023624) passed fmt, check, strict Clippy and **33 tests, zero failures**, including three new dictzip checks (chunk-crossing lookups, malformed RA/header rejection, and a fully staged compressed DICT → SQLite/FTS5 import). `tests/fixtures/synthetic.dict.dz` is original synthetic test data, valid as a gzip stream; no FreeDict package contents were used. Actual distributed FreeDict archives, malformed gzip footer CRC, and GUI QA require later independent verification.
