@@ -274,7 +274,11 @@ impl LexivaApp {
 
 impl eframe::App for LexivaApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        if let Some(mode) = self.darkman_watcher.as_ref().and_then(theme::DarkmanWatcher::latest) {
+        if let Some(mode) = self
+            .darkman_watcher
+            .as_ref()
+            .and_then(theme::DarkmanWatcher::latest)
+        {
             self.last_system_theme = Some(mode);
             if self.theme == ThemeChoice::System {
                 mode.apply(ui.ctx());

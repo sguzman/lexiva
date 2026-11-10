@@ -80,7 +80,7 @@ impl DarkmanWatcher {
             let runtime = std::env::var_os("XDG_RUNTIME_DIR")?;
             let path = std::path::PathBuf::from(runtime).join("darkman/control.sock");
             let mut stream = UnixStream::connect(path).ok()?;
-            stream.write_all(b"watch\\n").ok()?;
+            stream.write_all(b"watch\n").ok()?;
             let (send, updates) = std::sync::mpsc::channel();
             let ctx = ctx.clone();
             std::thread::Builder::new()
@@ -133,7 +133,7 @@ pub fn reader_scale_from_storage(value: Option<&str>) -> f32 {
 /// fonts for fallback glyphs. Lexiva never bundles third-party font files.
 pub fn configure_system_font(ctx: &egui::Context) {
     let Ok(output) = Command::new("fc-match")
-        .args(["-f", "%{file}\\n", "sans-serif"])
+        .args(["-f", "%{file}\n", "sans-serif"])
         .output()
     else {
         return;
@@ -191,8 +191,14 @@ mod tests {
 
     #[test]
     fn darkman_notifications_accept_only_explicit_modes() {
-        assert_eq!(ThemeChoice::from_darkman_message("light\\n"), Some(ThemeChoice::Light));
-        assert_eq!(ThemeChoice::from_darkman_message("dark"), Some(ThemeChoice::Dark));
+        assert_eq!(
+            ThemeChoice::from_darkman_message("light\n"),
+            Some(ThemeChoice::Light)
+        );
+        assert_eq!(
+            ThemeChoice::from_darkman_message("dark"),
+            Some(ThemeChoice::Dark)
+        );
         for input in ["", "toggle", "system", "red", "unknown"] {
             assert_eq!(ThemeChoice::from_darkman_message(input), None);
         }
