@@ -619,8 +619,8 @@ mod tests {
 
     #[test]
     fn lookup_navigation_does_not_capture_other_controls_or_background_windows() {
-        let lookup = egui::Id::new("lookup");
-        let language = egui::Id::new("language");
+        let lookup = egui::Id::unique();
+        let language = egui::Id::unique();
         assert!(lookup_shortcuts_allowed(true, None, lookup));
         assert!(lookup_shortcuts_allowed(true, Some(lookup), lookup));
         assert!(!lookup_shortcuts_allowed(true, Some(language), lookup));
