@@ -30,3 +30,7 @@ No dictionary content, fonts or non-MIT source licenses are implicitly shipped o
 - [Storage contract](STORAGE.md), [FreeDict adapter](DICT.md), [Wiktextract adapter](WIKTEXTRACT.md) and [roadmap](ROADMAP.md).
 
 - [CI 42875563900](https://github.com/sguzman/lexiva/actions/runs/42875563900): source manager's test-indexed FreeDict-style DICT and synthetic Wiktextract JSONL round trip, cancel-without-loss, local-index removal, and two independent query-language selectors.
+
+## Enabled sources and priority (schema v3)
+
+The source manager persists enabled status and explicit ↑/↓ priority ordering in SQLite `source_preferences`. An enabled source is selectable; disabled sources retain their cached data but are excluded **at the query level** from both ranked hits and typo suggestions, regardless of an explicit source filter. When searching all indexed dictionaries, exact matches still precede prefixes; ties are ordered by source priority and then spelling. See [source management](SOURCES.md).

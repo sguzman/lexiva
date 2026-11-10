@@ -1,6 +1,6 @@
 # Source discovery and local dictionary management
 
-**Scope:** M06 LEX-060/061 implemented and verified by [CI 42875563900](https://github.com/sguzman/lexiva/actions/runs/42875563900). Real target-machine Hyprland GUI QA and M06 LEX-062/063 remain pending.
+**Scope:** All M06 tasks LEX-060–063 implemented and verified to automated CI scope in [run 42880153881](https://github.com/sguzman/lexiva/actions/runs/42880153881). Real target-machine Hyprland GUI QA remains pending.
 
 ## Native interface
 
@@ -24,9 +24,27 @@ The catalog is at `$XDG_DATA_HOME/lexiva/catalog.sqlite` when that variable is a
 
 ## Not yet implemented or verified
 
-- **LEX-062:** Persistently enabled/disabled sources and user-controlled priority ordering.
-- **LEX-063:** Content-fingerprint change detection, package upgrade rescan prompts, missing-file recovery and explicit discard of abandoned staging from the interface.
+- Background source watching, cryptographic full-file content hash and automatic package-update reimports are not implemented.
+- GUI action to discard abandoned staging after process termination is not yet implemented; only the safe storage API supports it.
 - Actual Arch-installed FreeDict discovery/import and interactive UI behavior on the owner's Hyprland session (M01 LEX-011).
 - Real multi-gigabyte Wiktextract end-to-end GUI resource and disk-full handling.
 
 All imports are opt-in. No source content is implicitly licensed as MIT, copied into the repository, or downloaded automatically.
+
+## Persisted enable/disable and priority (LEX-062)
+
+SQLite schema v3 stores dictionary user preferences in `source_preferences`, separate from original dictionary source metadata. All preexisting sources migrate enabled by default, in deterministic initial order; future imports and metadata updates preserve these preferences.
+
+The **Indexed dictionary sources** list has a persistent **Enabled** checkbox and **↑/↓** controls for explicit priority ordering. Disabled sources disappear from the search dropdown and are filtered out **inside SQL** for both ranked headword searches and spelling suggestions. They retain their indexed entries and can be re-enabled without reimporting. Priority is respected for both source selection presentation and combined search results. A disabled source cannot be found by explicitly passing its source ID to the ranked search API.
+
+The migration preserves existing v1/v2 source IDs, published entries and incomplete staging. Preferences are retained when the database is reopened and when a source is upserted after reindex.
+
+## Explicit source change checks and reindex (LEX-063)
+
+Use **Check source files** to refresh file health without importing anything. The background manager compares the last successful import signature with current source files. DICT fingerprints cover **both** the `.index` and `.dict`/`.dict.dz` files; Wiktextract fingerprints cover the selected local JSONL input. Each signature includes file size, modification time and a bounded FNV-1a sample of the **first and last 8 KiB**, so checking large corpora does not reread them completely. This is an economical change detector, **not a collision-resistant full-file checksum**; an interior edit with identical size and modification time may not be detected.
+
+The indexed-source row shows **Up to date**, **Source changed — reindex**, **Source file missing — cached index retained**, or **Not yet verified — reindex**. An explicit **Reindex** rebuilds the selected source through the existing bounded, atomic importer; errors, missing files and cancellation retain the last published entries and source metadata. No automatic reimport runs after package updates. If a file is restored to the same path, **Check source files** enables reindexing again.
+
+**Remaining limitations:** no background filesystem watcher or package-manager hook, no automatic source relinking after a file has moved to a new path, no cryptographic full-dump hash, no disk-full preflight for enormous JSONL, and no GUI action yet to discard crashed/abandoned staging leases. These are future hardening/UX concerns rather than evidence of M06's narrower automated acceptance.
+
+[CI evidence](https://github.com/sguzman/lexiva/actions/runs/42880153881): 63 regular tests passed, with 4 additional FreeDict/Wiktextract/stress test cases; v2 migration, preference survival across reopen, disabled-source exclusion, priority rank, same-size source data edit, explicit reindex, missing-source preservation and cancelled reindex are included.

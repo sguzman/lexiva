@@ -1,6 +1,6 @@
-# Lexiva — Storage schema v2 and import recovery
+# Lexiva — Storage schema v3, preferences and import recovery
 
-The implemented local data foundation is in `src/model.rs`, `src/storage.rs`, `src/schema.sql`, `src/storage/import.rs`, and `src/migration_v1_to_v2.sql`. The original v1 schema is preserved in `src/schema_v1.sql` for deterministic migration tests.
+The implemented local data foundation is in `src/model.rs`, `src/storage.rs`, `src/schema.sql`, `src/storage/import.rs`, `src/migration_v1_to_v2.sql`, and `src/migration_v2_to_v3.sql`. The original v1 schema is preserved in `src/schema_v1.sql` for deterministic migration tests.
 
 ## Ownership and schema
 
@@ -9,6 +9,7 @@ The implemented local data foundation is in `src/model.rs`, `src/storage.rs`, `s
 - `lexical_entries` holds source-scoped entry IDs (allowing homographs), headwords, indexed language/POS fields and JSON preserving nested/ordered senses, examples and unknown structured source metadata.
 - `lexical_fts` is an FTS5 external-content index on headwords with `unicode61 remove_diacritics 2` and triggers that keep live inserts, deletes and updates in sync.
 - Schema v2 adds `staging_imports` and `staging_entries`. Pending entries are invisible to live searches until a successful atomic publish.
+- Schema v3 adds `source_preferences` with stable source IDs, persisted enabled flags and explicit priority ordering, plus an after-insert trigger that sets safe defaults for new sources. Existing source metadata updates do **not** overwrite user preferences; source removal cascades to preference records.
 
 ## Streaming and publication
 
@@ -22,14 +23,16 @@ The implemented local data foundation is in `src/model.rs`, `src/storage.rs`, `s
 
 ## Migration, integrity and recovery
 
-- Versioned `PRAGMA user_version` is 2. Existing schema-v1 databases are migrated transactionally, preserving source records and live entries. Unknown/future versions are refused.
-- A full `PRAGMA quick_check` is run before altering v1 data; explicit `check_catalog_integrity` is available for later checks. Because this is O(database size), **normal v2 startup does not run it**.
+- Versioned `PRAGMA user_version` is **3**. Existing v1 databases migrate through v2 and v3, while existing v2 databases migrate directly to v3. The new migration preserves source IDs, published lexical records, staging and index content. Unknown/future versions are refused.
+- A full `PRAGMA quick_check` is run before altering v1 data; explicit `check_catalog_integrity` is available for later checks. Because this is O(database size), **normal v3 startup does not run it**.
 - `check_fts_index` verifies FTS5 index consistency against live external-content rows. `rebuild_fts_index` reconstructs the *derived index* from preserved lexical records.
 - A database that cannot be opened or fails validation is not automatically erased or overwritten; higher-level user-controlled recovery and clear diagnostics are required before release.
-- Tests cover on-disk abandoned staging, explicit discard, SQLite v1→v2 migration, metadata retention, FTS corruption/rebuild and invalid-file preservation.
+- Tests cover on-disk abandoned staging, explicit discard, SQLite v1→v2→v3 and v2→v3 migrations, metadata retention, enabled/priority persistence, FTS corruption/rebuild and invalid-file preservation.
 
 ## Unfinished integration and release checks
 
-The GUI has no dictionary source/import wiring yet. Real FreeDict/Wiktionary files, multi-process instance policy, import disk-space UX, adapter parsing limits, large-scale performance and Hyprland runtime QA remain unverified.
+The GUI now has explicit DICT and Wiktextract local imports, search controls, persistent enabled/priority and source change checks. On-device Hyprland UI acceptance, multi-process instance policy, disk-space preflight/UX, end-to-end giant-dump performance and some broader adapter formats remain unverified.
 
 **Evidence:** [GitHub Actions run 42751965002](https://github.com/sguzman/lexiva/actions/runs/42751965002) passed 24 unit/integration-style tests, formatting, compilation and Clippy.
+
+**Latest evidence:** [CI 42880153881](https://github.com/sguzman/lexiva/actions/runs/42880153881): schema v3/migrations and persistent source settings passed unit tests plus the real FreeDict and Wiktextract regression suite.
