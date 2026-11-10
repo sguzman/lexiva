@@ -538,7 +538,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(imported, 4);
-        assert_eq!(store.search_prefix("cas", Some("es-en"), 10).unwrap().len(), 1);
+        assert_eq!(
+            store.search_prefix("cas", Some("es-en"), 10).unwrap().len(),
+            1
+        );
         store.check_fts_index().unwrap();
     }
 

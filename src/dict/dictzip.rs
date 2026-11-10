@@ -150,7 +150,11 @@ impl DictzipReader {
     }
 
     fn read_chunk(&mut self, index: usize) -> io::Result<&[u8]> {
-        if self.cached.as_ref().is_some_and(|(cached, _)| *cached == index) {
+        if self
+            .cached
+            .as_ref()
+            .is_some_and(|(cached, _)| *cached == index)
+        {
             return Ok(&self.cached.as_ref().expect("cache checked above").1);
         }
         let (offset, compressed_len) = self.chunks[index];
@@ -180,14 +184,18 @@ impl DictzipReader {
             consumed = decoder.total_in() as usize;
             written = decoder.total_out() as usize;
             if written > expected {
-                return Err(invalid("dictzip chunk exceeds declared uncompressed length"));
+                return Err(invalid(
+                    "dictzip chunk exceeds declared uncompressed length",
+                ));
             }
             if decoder.total_in() == old_in && decoder.total_out() == old_out {
                 return Err(invalid("dictzip decoder stopped before consuming chunk"));
             }
         }
         if written != expected {
-            return Err(invalid("dictzip chunk length differs from RA/ISIZE metadata"));
+            return Err(invalid(
+                "dictzip chunk length differs from RA/ISIZE metadata",
+            ));
         }
         output.truncate(written);
         self.cached = Some((index, output));
@@ -245,7 +253,11 @@ mod tests {
             std::process::id(),
             std::thread::current().name().unwrap_or("thread")
         ));
-        fs::write(&path, include_bytes!("../../tests/fixtures/synthetic.dict.dz")).unwrap();
+        fs::write(
+            &path,
+            include_bytes!("../../tests/fixtures/synthetic.dict.dz"),
+        )
+        .unwrap();
         (File::open(&path).unwrap(), path)
     }
 
