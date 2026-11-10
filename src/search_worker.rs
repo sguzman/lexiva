@@ -133,7 +133,9 @@ impl SearchWorker {
                                         };
                                         match suggestions {
                                             Ok(suggestions) => (sources, hits, suggestions, None),
-                                            Err(error) => (sources, hits, Vec::new(), Some(error.to_string())),
+                                            Err(error) => {
+                                                (sources, hits, Vec::new(), Some(error.to_string()))
+                                            }
                                         }
                                     }
                                     Err(error) => {
@@ -145,9 +147,7 @@ impl SearchWorker {
                                 (Vec::new(), Vec::new(), Vec::new(), Some(error.to_string()))
                             }
                         },
-                        Err(error) => {
-                            (Vec::new(), Vec::new(), Vec::new(), Some(error.to_string()))
-                        }
+                        Err(error) => (Vec::new(), Vec::new(), Vec::new(), Some(error.to_string())),
                     };
                     worker_active.store(0, Ordering::Release);
                     // A replaced query may have returned SQLITE_INTERRUPT;

@@ -269,25 +269,24 @@ impl eframe::App for LexivaApp {
         if response.changed() {
             self.dispatch_search();
         }
-        let focus_search = ui.input(|input| {
-            input.modifiers.ctrl && input.key_pressed(egui::Key::L)
-        });
+        let focus_search =
+            ui.input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::L));
         if focus_search {
             response.request_focus();
         }
-        let submitted = ui.input(|input| {
-            input.key_pressed(egui::Key::Enter) && !input.modifiers.ctrl
-        });
+        let submitted =
+            ui.input(|input| input.key_pressed(egui::Key::Enter) && !input.modifiers.ctrl);
         if submitted && response.has_focus() {
             self.history.remember(&self.query);
         }
-        let copy_shortcut = ui.input(|input| {
-            input.modifiers.ctrl && input.key_pressed(egui::Key::Enter)
-        });
+        let copy_shortcut =
+            ui.input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::Enter));
         if copy_shortcut {
-            if let Some(hit) = self.selected.as_ref().and_then(|selected| {
-                self.hits.iter().find(|hit| selected.matches(hit))
-            }) {
+            if let Some(hit) = self
+                .selected
+                .as_ref()
+                .and_then(|selected| self.hits.iter().find(|hit| selected.matches(hit)))
+            {
                 ui.ctx().copy_text(reader::copy_text(hit));
             }
         }
@@ -295,12 +294,10 @@ impl eframe::App for LexivaApp {
         // History is intentionally session-only for now. Ctrl+L focuses
         // lookup, Alt+Up/Down traverses submitted terms, ordinary arrows
         // select search results, and Ctrl+Enter copies the selected result.
-        let history_up = ui.input(|input| {
-            input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp)
-        });
-        let history_down = ui.input(|input| {
-            input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown)
-        });
+        let history_up =
+            ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp));
+        let history_down =
+            ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown));
         let recalled = if history_up {
             self.history.previous().map(str::to_owned)
         } else if history_down {
@@ -312,14 +309,10 @@ impl eframe::App for LexivaApp {
             self.query = query;
             self.dispatch_search();
         }
-        if ui.input(|input| {
-            !input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown)
-        }) {
+        if ui.input(|input| !input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown)) {
             self.move_selection(1);
         }
-        if ui.input(|input| {
-            !input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp)
-        }) {
+        if ui.input(|input| !input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp)) {
             self.move_selection(-1);
         }
         ui.add_space(5.0);

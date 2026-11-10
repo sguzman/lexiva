@@ -183,7 +183,6 @@ impl DictionaryStore {
     }
 }
 
-
 /// FTS5's Latin accent handling is approximated only for suggestion ranking.
 /// Stored source spelling is never rewritten or de-accented.
 fn fold_latin(value: &str) -> String {
@@ -392,7 +391,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn typo_suggestions_are_bounded_source_scoped_and_accent_aware() {
         let mut store = DictionaryStore::in_memory().unwrap();
@@ -420,17 +418,19 @@ mod tests {
             store.suggest_words("arboal", english, 8).unwrap(),
             ["árbol"]
         );
-        assert!(store
-            .suggest_words(
-                "casaa",
-                SearchFilters {
-                    source_id: Some("missing"),
-                    ..Default::default()
-                },
-                8
-            )
-            .unwrap()
-            .is_empty());
+        assert!(
+            store
+                .suggest_words(
+                    "casaa",
+                    SearchFilters {
+                        source_id: Some("missing"),
+                        ..Default::default()
+                    },
+                    8
+                )
+                .unwrap()
+                .is_empty()
+        );
         assert!(store.suggest_words("**", english, 8).unwrap().is_empty());
         assert!(store.suggest_words("casaa", english, 0).unwrap().is_empty());
     }
