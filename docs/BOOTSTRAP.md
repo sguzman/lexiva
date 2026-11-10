@@ -17,3 +17,7 @@ See ROADMAP.md for acceptance, including full on-device testing.
 - Lockfile commit: `8900edaded76ccfb842044e9a4fe2c6f9730fa4d`.
 - [GitHub Actions run 42743338343](https://github.com/sguzman/lexiva/actions/runs/42743338343): successful `cargo fmt`, `cargo check --locked --all-targets`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked --all-targets`.
 - Two preferences tests passed. No runtime Wayland/Hyprland GUI validation or dictionary importer yet.
+
+## Foundation checkpoint
+
+The initial shell baseline has been extended with `rusqlite` 0.41.1 (bundled SQLite), Serde and serde_json. [CI run 42746299152](https://github.com/sguzman/lexiva/actions/runs/42746299152) verified compilation, formatting, Clippy and **11 tests passing**. Dependency lockfile updated at `a4ea52d`; no native GUI runtime QA yet. The CI workflow was returned to read-only permissions after lockfile publication.

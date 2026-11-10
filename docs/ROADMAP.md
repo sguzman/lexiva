@@ -4,19 +4,19 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 
 ## Progress checkpoint
 
-- Verified: **8 / 100 points (8%)** (M00: 3 points documented; M01: 5 points compiled/tested). Previous: 3%; this round +5 percentage points.
-- Verified in CI: Rust 1.95.0, cargo fmt, cargo check, Clippy, both unit tests and committed Cargo.lock. Not verified: actual GUI launch, dictionary search, Hyprland theme detection or performance.
+- Verified: **18 / 100 weighted points (18%)**. Previous comparable checkpoint: 8%; this development round: **+10 percentage points**. M00 risk review +2; M02 model, SQLite/FTS, provenance +8. Source code and database tests passed; real dictionary import/GUI paths remain unverified.
+- Verified in [CI run 42746299152](https://github.com/sguzman/lexiva/actions/runs/42746299152): Rust 1.95.0 formatting, compilation, strict Clippy and **11/11 unit tests**, plus updated Cargo.lock at a4ea52d. Not verified: real dictionary import, native GUI launch, large streamed imports, Hyprland theme detection or performance.
 - Baseline commit: b0cb884657a22b3cf2ec91fa15f4765b94c3a605 on main before inception documentation.
 - Environment limitation: tool execution container currently has no Rust toolchain; actual build requires GitHub CI and user-machine QA.
-- Next: native GUI smoke/Hyprland verification of the shell (LEX-011), then build lexical foundation M02 while maintaining source/CI integrity.
+- Next: implement bounded staged streaming imports and atomic publication (LEX-023), followed by cache migration/recovery (LEX-024); the DICT importer can then be built on this foundation. Native GUI smoke/Hyprland verification (LEX-011) remains outstanding.
 
 ## Milestones
 
 | Phase | Weight | Verified | Status |
 |---|---:|---:|---|
-| M00 🧭 Inception & engineering contracts | 5 | 3 | active |
+| M00 🧭 Inception & engineering contracts | 5 | 5 | verified complete |
 | M01 🦀 Rust bootstrap | 6 | 5 | active |
-| M02 🗃️ Lexical data & search foundation | 11 | 0 | pending |
+| M02 🗃️ Lexical data & search foundation | 11 | 8 | active |
 | M03 📚 GNU DICT / Arch integration | 12 | 0 | pending |
 | M04 🌍 Wiktionary integration | 14 | 0 | pending |
 | M05 🔎 Search & reader | 13 | 0 | pending |
@@ -26,7 +26,7 @@ Baseline: 2026-11-09. Full-release scope and stable effort weights agreed with o
 | M09 🛡️ Hardening/performance | 6 | 0 | pending |
 | M10 📦 Documentation & distribution | 4 | 0 | pending |
 | M11 ✅ Acceptance & release | 3 | 0 | pending |
-| **Total** | **100** | **8** | **active** |
+| **Total** | **100** | **18** | **active** |
 
 ### M00 🧭 Inception & engineering contracts
 
@@ -37,7 +37,7 @@ Dependency: Repo reconnaissance; weight: 5 points.
 | LEX-001 📝 | Inception purpose, target users, MVP/full-scope, non-goals | 1 | Decision and evidence published in appropriate inception/architecture documentation. | verified complete |
 | LEX-002 🏗️ | Architecture, ownership, persistence and concurrency decisions | 1 | Decision and evidence published in appropriate inception/architecture documentation. | verified complete |
 | LEX-003 🎨 | Deterministic OKLCH identity and typography/color contract | 1 | Decision and evidence published in appropriate inception/architecture documentation. | verified complete |
-| LEX-004 ⚖️ | Risk and license review of all chosen dependencies and formats | 2 | Decision and evidence published in appropriate inception/architecture documentation. | pending |
+| LEX-004 ⚖️ | Risk and license review of all chosen dependencies and formats | 2 | Decision and evidence published in appropriate inception/architecture documentation. | verified complete |
 
 ### M01 🦀 Rust bootstrap
 
@@ -56,9 +56,9 @@ Dependency: M01; weight: 11 points.
 
 | ID | Deliverable | Weight | Objective exit evidence | Status |
 |---|---|---:|---|---|
-| LEX-020 🧬 | Typed entries, sense structure, POS, language, IPA and etymology | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-021 🗄️ | Versioned SQLite storage and source-aware FTS5 indexes | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
-| LEX-022 🪪 | Source provenance and preservation of ordered/lossy metadata | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
+| LEX-020 🧬 | Typed entries, sense structure, POS, language, IPA and etymology | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
+| LEX-021 🗄️ | Versioned SQLite storage and source-aware FTS5 indexes | 3 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
+| LEX-022 🪪 | Source provenance and preservation of ordered/lossy metadata | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | verified complete |
 | LEX-023 🔄 | Transactional staged imports and atomic index publication | 2 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
 | LEX-024 🩹 | Migration, corruption detection and safe cache recovery | 1 | Reproducible tests plus real-source or native GUI verification as appropriate; preserve data and source provenance. | pending |
 
@@ -196,3 +196,5 @@ Excluded: online server/account, telemetry, web/mobile app, automatic OS package
 - 2026-11-09: Repository inspected. Only LICENSE and .gitignore on main. Inception contracts accepted; documentation authored for M00 items 001–003; first bootstrap pending.
 
 - 2026-11-09: Commits `caab949` (native eframe shell + initial CI), `0850416` (fmt repair), `8900eda` (initial Cargo.lock); CI run [42743338343](https://github.com/sguzman/lexiva/actions/runs/42743338343) passed fmt, check, Clippy and 2 unit tests. LEX-010/012/013 verified. GUI launch not tested.
+
+- 2026-11-09 / 2026-11-10 UTC: Implemented `src/model.rs` (nested senses, language/provenance, metadata), `src/storage.rs` and `src/schema.sql` (SQLite v1 + FTS5 source-aware catalog). CI [42746299152](https://github.com/sguzman/lexiva/actions/runs/42746299152) passed fmt, check, Clippy and 11 tests (0 failures). Includes transactional batch rollback, homograph/source isolation, FTS replacement and future schema refusal; lockfile commit `a4ea52d`. LEX-020/021/022 verified; LEX-023/024 pending. Inception dependency/data license risks documented at [DEPENDENCIES](DEPENDENCIES.md) (LEX-004 verified).

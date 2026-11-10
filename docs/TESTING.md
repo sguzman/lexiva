@@ -23,3 +23,7 @@ Existing-index startup under 3 seconds; search p95 <150ms at ~100k headwords and
 ## Release discipline
 
 All applicable automated and on-device tests pass, packaging and installation path are verified, source/font license notices recorded and exact candidate commit is accepted by owner. Release/tag is an independently authorized action.
+
+## CI checkpoint: typed lexical storage
+
+[Run 42746299152](https://github.com/sguzman/lexiva/actions/runs/42746299152) succeeded on Rust 1.95.0, with 11 passing tests across theme persistence, model-language validation/round-trip, source provenance, source-scoped search, SQLite FTS updates, transactional replacement rollback, query escaping and schema-forward incompatibility. These are synthetic tests; no real FreeDict, Wiktionary, StarDict or TEI files have yet been tested, and source import/GUI performance remain unverified.

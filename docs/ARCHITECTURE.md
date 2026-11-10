@@ -13,3 +13,7 @@
 11. **Validation:** Automated fmt/check/clippy/test on CI; actual target GUI QA cannot be replaced by a green compilation badge. Measure latency on optimized builds with real sizes.
 
 Revisit decisions only when dependencies or actual requirements make a change necessary; do not scaffold unused crates or features.
+
+## Implemented foundation (schema v1)
+
+`src/model.rs` contains source-aware lexical records preserving ordered nested senses, examples, languages and unrecognized structured metadata; `src/storage.rs` provides a bundled SQLite catalog, transactional finite-batch replacement and source-scoped FTS5 prefix lookup with update/delete triggers. See [STORAGE.md](STORAGE.md) for the schema contract and known limits; [DEPENDENCIES.md](DEPENDENCIES.md) records crate/data-license decisions. The backend is not connected to UI; large staged streaming imports, migrations and crash recovery are not yet implemented.
