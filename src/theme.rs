@@ -322,13 +322,19 @@ mod tests {
         for mode in [eframe::egui::Theme::Light, eframe::egui::Theme::Dark] {
             let style = ctx.style_of(mode);
             assert_eq!(style.animation_time, 0.0);
-            assert_eq!(style.scroll_animation.duration, eframe::egui::Rangef::new(0.0, 0.0));
+            assert_eq!(
+                style.scroll_animation.duration,
+                eframe::egui::Rangef::new(0.0, 0.0)
+            );
         }
         configure_motion(&ctx, false);
         for mode in [eframe::egui::Theme::Light, eframe::egui::Theme::Dark] {
             let style = ctx.style_of(mode);
             assert_eq!(style.animation_time, 0.2);
-            assert_eq!(style.scroll_animation.duration, eframe::egui::Rangef::new(0.1, 0.3));
+            assert_eq!(
+                style.scroll_animation.duration,
+                eframe::egui::Rangef::new(0.1, 0.3)
+            );
         }
     }
 
