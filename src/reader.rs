@@ -34,7 +34,9 @@ pub fn copy_text(hit: &SearchHit) -> String {
     if let Some(attribution) = &hit.source.attribution {
         let _ = writeln!(output, "Attribution: {attribution}");
     }
-    output.trim_end().to_owned()
+    // Keep source-provided newlines; a copied FreeDict article must not
+    // lose its trailing whitespace or original line breaks.
+    output
 }
 
 fn append_sense(output: &mut String, sense: &Sense, index: &str) {
@@ -207,7 +209,7 @@ mod tests {
                     Sense {
                         number: Some("1".into()),
                         definition_language: Some("en".into()),
-                        glosses: vec!["tree".into()],
+                        glosses: vec!["tree\n".into()],
                         labels: vec![],
                         examples: vec![Example {
                             text: "El árbol es alto.".into(),
@@ -236,7 +238,7 @@ mod tests {
         let copy = copy_text(&hit);
         assert!(copy.contains("árbol"));
         assert!(copy.contains("Source: Test bilingual dictionary"));
-        assert!(copy.contains("1. tree"));
+        assert!(copy.contains("1. tree\n\n"));
         assert!(copy.contains("2. family tree"));
         assert!(copy.contains("Example: El árbol es alto."));
         assert!(copy.contains("Translation: The tree is tall."));
