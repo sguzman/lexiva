@@ -76,6 +76,20 @@ pub fn inspect_metadata(files: &DictFiles) -> io::Result<DictMetadata> {
         let text =
             std::str::from_utf8(&line).map_err(|_| invalid("invalid metadata index UTF-8"))?;
         let row = parse_row(text)?;
+        if row.lemma.is_empty() {
+            // FreeDict exports can begin with an index row with no keyword.
+            // This is neither metadata nor a lexical entry. Validate its
+            // range so corruption is not silently excused, then scan onward.
+            if row.length > MAX_ARTICLE_BYTES
+                || row
+                    .start
+                    .checked_add(row.length)
+                    .is_none_or(|end| end > data.len())
+            {
+                return Err(invalid("DICT empty-headword row exceeds data bounds"));
+            }
+            continue;
+        }
         if let Some(key) = admin_key(row.lemma) {
             if row.length > MAX_ARTICLE_BYTES
                 || row
@@ -295,6 +309,20 @@ mod tests {
             source.metadata["dict"]["admin_url_raw"],
             "Found at https://freedict.org/\n"
         );
+    }
+
+    #[test]
+    fn metadata_scanning_skips_empty_headword_and_rejects_bad_ranges() {
+        let fixture = Fixture::new();
+        let files = fixture.files(
+            "eng-spa",
+            "\\tA\\tB\\n00-database-short\\tA\\tB\\nword\\tA\\tB\\n",
+            "x",
+        );
+        let info = inspect_metadata(&files).unwrap();
+        assert_eq!(info.short.as_deref(), Some("x"));
+        let broken = fixture.files("bad", "\\tB\\tB\\nword\\tA\\tB\\n", "x");
+        assert!(inspect_metadata(&broken).is_err());
     }
 
     #[test]

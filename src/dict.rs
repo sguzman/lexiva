@@ -126,9 +126,9 @@ fn parse_row(line: &str) -> io::Result<IndexRow<'_>> {
     if parts.next().is_some() {
         return Err(invalid("unexpected extra DICT index field"));
     }
-    if lemma.is_empty() {
-        return Err(invalid("empty DICT headword"));
-    }
+    // Some distributed dictd indexes contain a well-formed record whose
+    // headword is empty (often the first row). Accept its structure here;
+    // readers skip it after independently validating its byte range.
     Ok(IndexRow {
         lemma,
         start: decode_position(start)?,
@@ -232,6 +232,12 @@ impl DictReader {
                     "DICT index line {} points past data file",
                     self.line_no
                 )));
+            }
+            // Empty-headword records occur in distributed FreeDict indexes.
+            // They are not searchable entries, but their offsets and lengths
+            // have already passed the same strict bounds checks as words.
+            if row.lemma.is_empty() {
+                continue;
             }
             // Dictd administrative records are source metadata, not headwords.
             if row.lemma.starts_with("00-database-") || row.lemma == "00databaseshort" {
@@ -553,12 +559,61 @@ mod tests {
     }
 
     #[test]
+    fn leading_empty_headword_is_skipped_but_following_words_import() {
+        let fixture = FixtureDir::new();
+        let header = "English - Spanish FreeDict";
+        let article = "house - casa\\n";
+        let data = format!("{header}{article}");
+        let index = format!(
+            "\\tA\\t{}\\n00-database-short\\tA\\t{}\\nhouse\\t{}\\t{}\\n",
+            encode(header.len() as u64),
+            encode(header.len() as u64),
+            encode(header.len() as u64),
+            encode(article.len() as u64),
+        );
+        let files = fixture.pair("eng-spa", index.as_bytes(), data.as_bytes());
+        let source = metadata::source_from_files(&files, "en-es").unwrap();
+        assert_eq!(source.title, header);
+        assert_eq!(source.headword_language.as_deref(), Some("en"));
+        assert_eq!(source.definition_language.as_deref(), Some("es"));
+
+        let entries: Vec<_> = DictReader::open(&source, &files)
+            .unwrap()
+            .collect::<StoreResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].lemma, "house");
+        assert_eq!(entries[0].source_entry_id, "index-line:3");
+        assert_eq!(entries[0].senses[0].glosses[0], article);
+
+        let mut store = DictionaryStore::in_memory().unwrap();
+        store.upsert_source(&source).unwrap();
+        assert_eq!(
+            store
+                .import_stream(
+                    &source.id,
+                    DictReader::open(&source, &files).unwrap(),
+                    || false,
+                    |_| {},
+                )
+                .unwrap(),
+            1
+        );
+        assert_eq!(store.search_prefix("hou", Some(&source.id), 10).unwrap().len(), 1);
+        store.check_fts_index().unwrap();
+    }
+
+    #[test]
     fn truncated_and_invalid_index_rows_fail_closed() {
         for row in [
             "casa\tA\n",
             "casa\tA\t\n",
             "casa\tA\tB\textra\n",
-            "\tA\tB\n",
+            "\tA\n",
+            "\tA\t\n",
+            "\tA\tB\textra\n",
+            "\t*\tB\n",
+            "\tB\tB\n",
             "casa\t*\tB\n",
         ] {
             let fixture = FixtureDir::new();
