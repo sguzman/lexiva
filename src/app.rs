@@ -59,7 +59,10 @@ impl LexivaApp {
                 Ok(worker) => (Some(worker), None),
                 Err(error) => (None, Some(format!("Could not start search: {error}"))),
             },
-            Err(error) => (None, Some(format!("Could not open catalog folder: {error}"))),
+            Err(error) => (
+                None,
+                Some(format!("Could not open catalog folder: {error}")),
+            ),
         };
         let mut app = Self {
             theme,
@@ -126,8 +129,7 @@ impl LexivaApp {
             .as_ref()
             .and_then(|key| self.hits.iter().position(|hit| key.matches(hit)))
             .unwrap_or(0);
-        let next = (selected_index as isize + delta)
-            .rem_euclid(self.hits.len() as isize) as usize;
+        let next = (selected_index as isize + delta).rem_euclid(self.hits.len() as isize) as usize;
         self.selected = Some(EntryKey::from_hit(&self.hits[next]));
     }
 
@@ -252,10 +254,8 @@ impl eframe::App for LexivaApp {
                 .id_salt("lexiva_result_list")
                 .show(&mut columns[0], |ui| {
                     for hit in &self.hits {
-                        let is_selected = self
-                            .selected
-                            .as_ref()
-                            .is_some_and(|key| key.matches(hit));
+                        let is_selected =
+                            self.selected.as_ref().is_some_and(|key| key.matches(hit));
                         let title = format!(
                             "{}{}",
                             hit.entry.lemma,
@@ -280,9 +280,10 @@ impl eframe::App for LexivaApp {
             egui::ScrollArea::vertical()
                 .id_salt("lexiva_definition_reader")
                 .show(&mut columns[1], |ui| {
-                    let selected = self.selected.as_ref().and_then(|key| {
-                        self.hits.iter().find(|hit| key.matches(hit))
-                    });
+                    let selected = self
+                        .selected
+                        .as_ref()
+                        .and_then(|key| self.hits.iter().find(|hit| key.matches(hit)));
                     if let Some(hit) = selected {
                         reader::show(ui, hit);
                     } else {

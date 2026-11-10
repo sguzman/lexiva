@@ -156,7 +156,9 @@ pub fn catalog_path() -> io::Result<PathBuf> {
     let xdg = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from);
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let path = catalog_path_for(xdg.as_deref(), home.as_deref())?;
-    let parent = path.parent().ok_or_else(|| io::Error::other("invalid catalog path"))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("invalid catalog path"))?;
     std::fs::create_dir_all(parent)?;
     Ok(path)
 }
@@ -182,10 +184,7 @@ mod tests {
     #[test]
     fn unselected_scope_never_means_search_every_source() {
         assert_eq!(SearchScope::default(), SearchScope::Unselected);
-        assert_eq!(
-            SearchScope::Unselected.label(&[]),
-            "Choose a dictionary"
-        );
+        assert_eq!(SearchScope::Unselected.label(&[]), "Choose a dictionary");
         assert_eq!(SearchScope::All.label(&[]), "All indexed dictionaries");
     }
 }
