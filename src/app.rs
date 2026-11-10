@@ -360,8 +360,17 @@ impl LexivaApp {
         let colors = theme::palette(ui.visuals().dark_mode);
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
-                ui.label(egui::RichText::new("Lexiva").size(30.0).strong().color(colors.accent));
-                ui.label(egui::RichText::new("Your offline dictionary library").size(13.0).color(colors.secondary));
+                ui.label(
+                    egui::RichText::new("Lexiva")
+                        .size(30.0)
+                        .strong()
+                        .color(colors.accent),
+                );
+                ui.label(
+                    egui::RichText::new("Your offline dictionary library")
+                        .size(13.0)
+                        .color(colors.secondary),
+                );
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let previous = self.theme;
@@ -436,121 +445,141 @@ impl LexivaApp {
             .inner_margin(egui::Margin::same(16))
             .show(ui, |ui| {
                 ui.set_min_width(ui.available_width());
-                ui.label(egui::RichText::new("LOOK UP A WORD").size(12.0).strong().color(colors.secondary));
+                ui.label(
+                    egui::RichText::new("LOOK UP A WORD")
+                        .size(12.0)
+                        .strong()
+                        .color(colors.secondary),
+                );
                 ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            ui.label("Dictionary");
-            let previous = self.scope.clone();
-            egui::ComboBox::from_id_salt("lexiva_source_choice")
-                .selected_text(self.scope.label(&self.sources))
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(
-                        &mut self.scope,
-                        SearchScope::Unselected,
-                        "Choose a dictionary",
+                ui.horizontal(|ui| {
+                    ui.label("Dictionary");
+                    let previous = self.scope.clone();
+                    egui::ComboBox::from_id_salt("lexiva_source_choice")
+                        .selected_text(self.scope.label(&self.sources))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut self.scope,
+                                SearchScope::Unselected,
+                                "Choose a dictionary",
+                            );
+                            ui.selectable_value(
+                                &mut self.scope,
+                                SearchScope::All,
+                                "All indexed dictionaries (explicit)",
+                            );
+                            for source in &self.sources {
+                                ui.selectable_value(
+                                    &mut self.scope,
+                                    SearchScope::Source(source.id.clone()),
+                                    &source.title,
+                                );
+                            }
+                        });
+                    if self.scope != previous {
+                        self.dispatch_search();
+                    }
+                    ui.weak(format!("{} indexed sources", self.sources.len()));
+                });
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("Word language");
+                    let word = ui.add(
+                        egui::TextEdit::singleline(&mut self.headword_language)
+                            .hint_text("Any (e.g. es)")
+                            .desired_width(115.0),
                     );
-                    ui.selectable_value(
-                        &mut self.scope,
-                        SearchScope::All,
-                        "All indexed dictionaries (explicit)",
+                    ui.label("Definition language");
+                    let meaning = ui.add(
+                        egui::TextEdit::singleline(&mut self.definition_language)
+                            .hint_text("Any (e.g. en)")
+                            .desired_width(115.0),
                     );
-                    for source in &self.sources {
-                        ui.selectable_value(
-                            &mut self.scope,
-                            SearchScope::Source(source.id.clone()),
-                            &source.title,
-                        );
+                    if word.changed() || meaning.changed() {
+                        self.dispatch_search();
                     }
                 });
-            if self.scope != previous {
-                self.dispatch_search();
-            }
-            ui.weak(format!("{} indexed sources", self.sources.len()));
-        });
-        ui.add_space(8.0);
-        ui.horizontal_wrapped(|ui| {
-            ui.label("Word language");
-            let word = ui.add(
-                egui::TextEdit::singleline(&mut self.headword_language)
-                    .hint_text("Any (e.g. es)")
-                    .desired_width(115.0),
-            );
-            ui.label("Definition language");
-            let meaning = ui.add(
-                egui::TextEdit::singleline(&mut self.definition_language)
-                    .hint_text("Any (e.g. en)")
-                    .desired_width(115.0),
-            );
-            if word.changed() || meaning.changed() {
-                self.dispatch_search();
-            }
-        });
-        ui.add_space(8.0);
+                ui.add_space(8.0);
 
-        let response = ui.add(
-            egui::TextEdit::singleline(&mut self.query)
-                .hint_text("Look up a word…")
-                .desired_width(f32::INFINITY),
-        );
-        if response.changed() {
-            self.dispatch_search();
-        }
-        let focus_search =
-            ui.input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::L));
-        if focus_search {
-            response.request_focus();
-        }
-        let submitted =
-            ui.input(|input| input.key_pressed(egui::Key::Enter) && !input.modifiers.ctrl);
-        if submitted && response.has_focus() {
-            self.history.remember(&self.query);
-        }
-        let shortcut_context = lookup_shortcuts_allowed(
-            ui.input(|input| input.focused),
-            ui.ctx().memory(|memory| memory.focused()),
-            response.id,
-        );
-        let copy_shortcut = shortcut_context
-            && ui.input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::Enter));
-        if copy_shortcut
-            && let Some(hit) = self
-                .selected
-                .as_ref()
-                .and_then(|selected| self.hits.iter().find(|hit| selected.matches(hit)))
-        {
-            ui.ctx().copy_text(reader::copy_text(hit));
-        }
+                let response = ui.add(
+                    egui::TextEdit::singleline(&mut self.query)
+                        .hint_text("Look up a word…")
+                        .desired_width(f32::INFINITY),
+                );
+                if response.changed() {
+                    self.dispatch_search();
+                }
+                let focus_search =
+                    ui.input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::L));
+                if focus_search {
+                    response.request_focus();
+                }
+                let submitted =
+                    ui.input(|input| input.key_pressed(egui::Key::Enter) && !input.modifiers.ctrl);
+                if submitted && response.has_focus() {
+                    self.history.remember(&self.query);
+                }
+                let shortcut_context = lookup_shortcuts_allowed(
+                    ui.input(|input| input.focused),
+                    ui.ctx().memory(|memory| memory.focused()),
+                    response.id,
+                );
+                let copy_shortcut = shortcut_context
+                    && ui
+                        .input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::Enter));
+                if copy_shortcut
+                    && let Some(hit) = self
+                        .selected
+                        .as_ref()
+                        .and_then(|selected| self.hits.iter().find(|hit| selected.matches(hit)))
+                {
+                    ui.ctx().copy_text(reader::copy_text(hit));
+                }
 
-        // History is intentionally session-only for now. Ctrl+L focuses
-        // lookup, Alt+Up/Down traverses submitted terms, ordinary arrows
-        // select search results, and Ctrl+Enter copies the selected result.
-        let history_up = shortcut_context
-            && ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp));
-        let history_down = shortcut_context
-            && ui.input(|input| input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown));
-        let recalled = if history_up {
-            self.history.previous().map(str::to_owned)
-        } else if history_down {
-            self.history.next().map(str::to_owned)
-        } else {
-            None
-        };
-        if let Some(query) = recalled {
-            self.query = query;
-            self.dispatch_search();
-        }
-        if shortcut_context
-            && ui.input(|input| !input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown))
-        {
-            self.move_selection(1);
-        }
-        if shortcut_context
-            && ui.input(|input| !input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp))
-        {
-            self.move_selection(-1);
-        }
-        ui.add_space(8.0);
-        ui.label(egui::RichText::new("Ctrl+L focus  ·  ↑↓ select  ·  Alt+↑↓ history  ·  Ctrl+Enter copy").size(12.0).color(colors.secondary));
+                // History is intentionally session-only for now. Ctrl+L focuses
+                // lookup, Alt+Up/Down traverses submitted terms, ordinary arrows
+                // select search results, and Ctrl+Enter copies the selected result.
+                let history_up = shortcut_context
+                    && ui.input(|input| {
+                        input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp)
+                    });
+                let history_down = shortcut_context
+                    && ui.input(|input| {
+                        input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown)
+                    });
+                let recalled = if history_up {
+                    self.history.previous().map(str::to_owned)
+                } else if history_down {
+                    self.history.next().map(str::to_owned)
+                } else {
+                    None
+                };
+                if let Some(query) = recalled {
+                    self.query = query;
+                    self.dispatch_search();
+                }
+                if shortcut_context
+                    && ui.input(|input| {
+                        !input.modifiers.alt && input.key_pressed(egui::Key::ArrowDown)
+                    })
+                {
+                    self.move_selection(1);
+                }
+                if shortcut_context
+                    && ui.input(|input| {
+                        !input.modifiers.alt && input.key_pressed(egui::Key::ArrowUp)
+                    })
+                {
+                    self.move_selection(-1);
+                }
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new(
+                        "Ctrl+L focus  ·  ↑↓ select  ·  Alt+↑↓ history  ·  Ctrl+Enter copy",
+                    )
+                    .size(12.0)
+                    .color(colors.secondary),
+                );
             });
         ui.add_space(10.0);
         if self.pending {

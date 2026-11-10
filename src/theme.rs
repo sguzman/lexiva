@@ -296,8 +296,9 @@ pub fn configure_palette(ctx: &egui::Context, high_contrast: bool) {
 #[cfg(test)]
 mod tests {
     use super::{
-        ThemeChoice, configure_motion, configure_palette, high_contrast_from_storage, palette,
-        interface_scale_from_storage, reader_scale_from_storage, reduced_motion_from_storage,
+        ThemeChoice, configure_motion, configure_palette, high_contrast_from_storage,
+        interface_scale_from_storage, palette, reader_scale_from_storage,
+        reduced_motion_from_storage,
     };
 
     #[test]
