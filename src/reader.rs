@@ -102,7 +102,11 @@ pub fn show(ui: &mut egui::Ui, hit: &SearchHit, scale: f32) {
         ui.add_space(8.0);
     }
 
-    ui.label(egui::RichText::new("Definitions").strong().size(18.0 * scale));
+    ui.label(
+        egui::RichText::new("Definitions")
+            .strong()
+            .size(18.0 * scale),
+    );
     ui.add_space(5.0);
     if word.senses.is_empty() {
         ui.weak("This source has no parsed definitions for this entry.");
@@ -129,7 +133,10 @@ pub fn show(ui: &mut egui::Ui, hit: &SearchHit, scale: f32) {
         ui.separator();
         ui.label(egui::RichText::new("Related words").strong());
         for relation in &word.relations {
-            ui.label(egui::RichText::new(format!("{} · {}", relation.kind, relation.term)).size(16.0 * scale));
+            ui.label(
+                egui::RichText::new(format!("{} · {}", relation.kind, relation.term))
+                    .size(16.0 * scale),
+            );
         }
     }
 
@@ -162,7 +169,11 @@ fn show_sense(ui: &mut egui::Ui, sense: &Sense, index: &str, scale: f32) {
         ui.weak(sense.labels.join(" · "));
     }
     for example in &sense.examples {
-        ui.label(egui::RichText::new(&example.text).italics().size(15.0 * scale));
+        ui.label(
+            egui::RichText::new(&example.text)
+                .italics()
+                .size(15.0 * scale),
+        );
         if let Some(translation) = &example.translation {
             ui.weak(translation);
         }
