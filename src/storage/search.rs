@@ -103,11 +103,7 @@ impl DictionaryStore {
                         .cmp(&right.entry.lemma.to_lowercase())
                 })
                 .then_with(|| left.entry.source_id.cmp(&right.entry.source_id))
-                .then_with(|| {
-                    left.entry
-                        .source_entry_id
-                        .cmp(&right.entry.source_entry_id)
-                })
+                .then_with(|| left.entry.source_entry_id.cmp(&right.entry.source_entry_id))
         });
         collected.truncate(limit.min(MAX_SEARCH_HITS));
         Ok(collected)
@@ -185,7 +181,10 @@ mod tests {
         assert_eq!(
             exact
                 .iter()
-                .map(|hit| (hit.entry.source_id.as_str(), hit.entry.source_entry_id.as_str()))
+                .map(|hit| (
+                    hit.entry.source_id.as_str(),
+                    hit.entry.source_entry_id.as_str()
+                ))
                 .collect::<Vec<_>>(),
             [("a", "1"), ("a", "2"), ("b", "1")]
         );
