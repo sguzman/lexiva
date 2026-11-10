@@ -26,7 +26,10 @@ impl fmt::Display for StoreError {
             Self::Json(error) => write!(f, "dictionary record serialization error: {error}"),
             Self::Invalid(reason) => write!(f, "invalid dictionary data: {reason}"),
             Self::UnsupportedSchema(version) => {
-                write!(f, "database schema version {version} is newer than Lexiva supports")
+                write!(
+                    f,
+                    "database schema version {version} is newer than Lexiva supports"
+                )
             }
         }
     }
@@ -118,7 +121,10 @@ impl DictionaryStore {
             .get_source(source_id)?
             .ok_or(StoreError::Invalid("dictionary source is not registered"))?;
         let tx = self.conn.transaction()?;
-        tx.execute("DELETE FROM lexical_entries WHERE source_id = ?1", [source_id])?;
+        tx.execute(
+            "DELETE FROM lexical_entries WHERE source_id = ?1",
+            [source_id],
+        )?;
         for entry in entries {
             entry.validate().map_err(StoreError::Invalid)?;
             if entry.source_id != source_id {
@@ -134,8 +140,14 @@ impl DictionaryStore {
                     entry.source_id,
                     entry.source_entry_id,
                     entry.lemma,
-                    entry.headword_language.as_deref().or(source.headword_language.as_deref()),
-                    entry.definition_language.as_deref().or(source.definition_language.as_deref()),
+                    entry
+                        .headword_language
+                        .as_deref()
+                        .or(source.headword_language.as_deref()),
+                    entry
+                        .definition_language
+                        .as_deref()
+                        .or(source.definition_language.as_deref()),
                     entry.part_of_speech,
                     payload
                 ],
@@ -267,7 +279,9 @@ mod tests {
         let a = entry("es-en", "homograph:1", "casa");
         let b = entry("es-en", "homograph:2", "casa");
         let c = entry("es-es", "lemma:1", "casa");
-        store.replace_source_entries("es-en", &[a.clone(), b.clone()]).unwrap();
+        store
+            .replace_source_entries("es-en", &[a.clone(), b.clone()])
+            .unwrap();
         store.replace_source_entries("es-es", &[c.clone()]).unwrap();
         assert_eq!(store.count_entries("es-en").unwrap(), 2);
         assert_eq!(store.get_entry("es-en", "homograph:1").unwrap(), Some(a));
@@ -276,7 +290,10 @@ mod tests {
         let scoped = store.search_prefix("cas", Some("es-en"), 10).unwrap();
         assert_eq!(scoped.len(), 2);
         assert!(scoped.iter().all(|item| item.source_id == "es-en"));
-        assert_eq!(store.search_prefix("cas", Some("es-es"), 10).unwrap(), vec![c]);
+        assert_eq!(
+            store.search_prefix("cas", Some("es-es"), 10).unwrap(),
+            vec![c]
+        );
     }
 
     #[test]
@@ -284,18 +301,24 @@ mod tests {
         let mut store = DictionaryStore::in_memory().unwrap();
         store.upsert_source(&source("es-en", "en")).unwrap();
         let old = entry("es-en", "old", "árbol");
-        store.replace_source_entries("es-en", &[old.clone()]).unwrap();
+        store
+            .replace_source_entries("es-en", &[old.clone()])
+            .unwrap();
 
         let first = entry("es-en", "same", "casa");
         let duplicate = entry("es-en", "same", "casita");
-        assert!(store
-            .replace_source_entries("es-en", &[first, duplicate])
-            .is_err());
+        assert!(
+            store
+                .replace_source_entries("es-en", &[first, duplicate])
+                .is_err()
+        );
         assert_eq!(store.count_entries("es-en").unwrap(), 1);
         assert_eq!(store.get_entry("es-en", "old").unwrap(), Some(old));
 
         let newer = entry("es-en", "new", "hogar");
-        store.replace_source_entries("es-en", &[newer.clone()]).unwrap();
+        store
+            .replace_source_entries("es-en", &[newer.clone()])
+            .unwrap();
         assert!(store.search_prefix("ár", None, 10).unwrap().is_empty());
         assert_eq!(store.search_prefix("hog", None, 10).unwrap(), vec![newer]);
         store.replace_source_entries("es-en", &[]).unwrap();
@@ -307,7 +330,9 @@ mod tests {
     fn query_is_escaped_and_empty_queries_are_harmless() {
         let mut store = DictionaryStore::in_memory().unwrap();
         store.upsert_source(&source("es-en", "en")).unwrap();
-        store.replace_source_entries("es-en", &[entry("es-en", "1", "casa")]).unwrap();
+        store
+            .replace_source_entries("es-en", &[entry("es-en", "1", "casa")])
+            .unwrap();
         assert_eq!(store.search_prefix("", None, 10).unwrap(), Vec::new());
         assert_eq!(store.search_prefix("\"", None, 10).unwrap(), Vec::new());
         assert_eq!(store.search_prefix("casa", None, 0).unwrap(), Vec::new());
@@ -334,7 +359,9 @@ mod tests {
         let mut item = entry("unknown", "1", "azul");
         item.headword_language = None;
         item.senses.clear();
-        store.replace_source_entries("unknown", &[item.clone()]).unwrap();
+        store
+            .replace_source_entries("unknown", &[item.clone()])
+            .unwrap();
         assert_eq!(store.get_entry("unknown", "1").unwrap(), Some(item));
     }
 }
