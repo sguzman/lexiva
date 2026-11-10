@@ -518,6 +518,58 @@ mod tests {
     }
 
     #[test]
+    fn source_enabled_and_priority_are_persistent_and_affect_search() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let i = NEXT.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "lexiva-prefs-{}-{i}.sqlite",
+            std::process::id()
+        ));
+        let mut store = DictionaryStore::open(&path).unwrap();
+        store.upsert_source(&source("a", "en")).unwrap();
+        store.upsert_source(&source("b", "en")).unwrap();
+        store
+            .replace_source_entries("a", &[entry("a", "1", "casa", "house")])
+            .unwrap();
+        store
+            .replace_source_entries("b", &[entry("b", "1", "casa", "home")])
+            .unwrap();
+        assert_eq!(store.list_enabled_sources().unwrap().len(), 2);
+        assert_eq!(store.list_source_settings().unwrap()[0].source.id, "a");
+        assert!(store.move_source("b", -1).unwrap());
+        assert_eq!(store.list_source_settings().unwrap()[0].source.id, "b");
+        assert_eq!(
+            store.search_ranked("casa", SearchFilters::default(), 10)
+                .unwrap()[0].entry.source_id,
+            "b"
+        );
+        store.set_source_enabled("a", false).unwrap();
+        assert!(store.search_ranked("casa", SearchFilters {
+            source_id: Some("a"),
+            ..Default::default()
+        }, 10).unwrap().is_empty());
+        assert!(store.suggest_words("casaa", SearchFilters {
+            source_id: Some("a"),
+            ..Default::default()
+        }, 8).unwrap().is_empty());
+        assert_eq!(store.list_enabled_sources().unwrap().len(), 1);
+        assert!(!store.move_source("b", -1).unwrap());
+        assert!(store.set_source_enabled("missing", true).is_err());
+
+        drop(store);
+        let mut reopened = DictionaryStore::open(&path).unwrap();
+        assert_eq!(reopened.list_source_settings().unwrap()[0].source.id, "b");
+        assert!(!reopened.list_source_settings().unwrap()[1].enabled);
+        reopened.upsert_source(&source("a", "en")).unwrap();
+        assert!(!reopened.list_source_settings().unwrap()[1].enabled);
+        reopened.set_source_enabled("a", true).unwrap();
+        assert_eq!(reopened.list_enabled_sources().unwrap().len(), 2);
+        drop(reopened);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn bounded_safe_query_and_empty_input() {
         let mut store = DictionaryStore::in_memory().unwrap();
         store.upsert_source(&source("a", "en")).unwrap();

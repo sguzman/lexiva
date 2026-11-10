@@ -57,6 +57,24 @@ mod tests {
     }
 
     #[test]
+    fn v2_migration_preserves_published_entries_and_default_preferences() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(include_str!("../schema_v1.sql")).unwrap();
+        let payload = serde_json::to_string(&source()).unwrap();
+        conn.execute("INSERT INTO dictionary_sources (id, payload) VALUES ('legacy', ?1)", [payload])
+            .unwrap();
+        conn.execute_batch(include_str!("../migration_v1_to_v2.sql"))
+            .unwrap();
+        let store = DictionaryStore::initialize(conn).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        let rows = store.list_source_settings().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].enabled);
+        assert_eq!(rows[0].priority, 0);
+        assert_eq!(rows[0].source, source());
+    }
+
+    #[test]
     fn rebuild_fts_recovers_live_entries() {
         let mut store = DictionaryStore::in_memory().unwrap();
         store.upsert_source(&source()).unwrap();

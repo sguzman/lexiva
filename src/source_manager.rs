@@ -13,7 +13,7 @@ use eframe::egui;
 
 use crate::dict::{self, DictFiles, DictReader};
 use crate::model::DictionarySource;
-use crate::storage::DictionaryStore;
+use crate::storage::{DictionaryStore, SourceSettings};
 use crate::wiktextract::{self, WiktextractReader, WiktionaryEdition};
 
 const MAX_DISCOVERED: usize = 256;
@@ -29,6 +29,8 @@ enum Command {
     Scan(Option<PathBuf>),
     ImportDict(Box<DiscoveredDict>),
     Remove(String),
+    SetEnabled(String, bool),
+    MovePriority(String, isize),
     ImportJsonl {
         path: PathBuf,
         edition: WiktionaryEdition,
@@ -40,11 +42,12 @@ enum Command {
 pub enum ManagerChange {
     Imported(String),
     Removed(String),
+    Preferences(String),
 }
 
 #[derive(Clone, Debug)]
 struct IndexedSource {
-    source: DictionarySource,
+    settings: SourceSettings,
     count: i64,
 }
 
@@ -52,6 +55,7 @@ enum Event {
     Found(Vec<DiscoveredDict>),
     Catalog(Vec<IndexedSource>),
     Removed(String),
+    Preferences(String),
     Progress(usize),
     Imported { source_id: String, count: usize },
     Error(String),
@@ -106,14 +110,14 @@ fn scan(store: &DictionaryStore, directory: Option<&Path>) -> Result<Vec<Discove
 
 fn indexed_catalog(store: &DictionaryStore) -> Result<Vec<IndexedSource>, String> {
     store
-        .list_sources()
+        .list_source_settings()
         .map_err(|error| error.to_string())?
         .into_iter()
-        .map(|source| {
+        .map(|settings| {
             let count = store
-                .count_entries(&source.id)
+                .count_entries(&settings.source.id)
                 .map_err(|error| error.to_string())?;
-            Ok(IndexedSource { source, count })
+            Ok(IndexedSource { settings, count })
         })
         .collect()
 }
@@ -231,6 +235,22 @@ impl SourceManager {
                             import_dict(&mut store, &candidate, &worker_cancel, &outgoing)
                                 .map(|count| Some((candidate.source.id, count)))
                         }
+                        Command::SetEnabled(id, enabled) => store
+                            .set_source_enabled(&id, enabled)
+                            .map_err(|error| error.to_string())
+                            .map(|()| {
+                                let _ = outgoing.send(Event::Preferences(id));
+                                None
+                            }),
+                        Command::MovePriority(id, direction) => store
+                            .move_source(&id, direction)
+                            .map_err(|error| error.to_string())
+                            .map(|moved| {
+                                if moved {
+                                    let _ = outgoing.send(Event::Preferences(id));
+                                }
+                                None
+                            }),
                         Command::Remove(id) => store
                             .remove_source(&id)
                             .map_err(|error| error.to_string())
@@ -310,6 +330,11 @@ impl SourceManager {
                 Event::Catalog(indexed) => {
                     self.indexed = indexed;
                 }
+                Event::Preferences(id) => {
+                    self.busy = false;
+                    self.status = "Dictionary preferences saved.".into();
+                    changed = Some(ManagerChange::Preferences(id));
+                }
                 Event::Removed(id) => {
                     self.busy = false;
                     self.status = "Removed local index; dictionary files are unchanged.".into();
@@ -345,6 +370,12 @@ impl SourceManager {
             }
         }
         changed
+    }
+
+    pub fn is_enabled(&self, source_id: &str) -> bool {
+        self.indexed
+            .iter()
+            .any(|item| item.settings.source.id == source_id && item.settings.enabled)
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) {
@@ -391,10 +422,27 @@ impl SourceManager {
                 }
                 ui.separator();
                 ui.strong("Indexed dictionary sources");
-                for item in self.indexed.clone() {
+                for (index, item) in self.indexed.clone().into_iter().enumerate() {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(format!("{} · {} entries", item.source.title, item.count));
+                        let mut enabled = item.settings.enabled;
+                        if ui
+                            .add_enabled(
+                                !self.busy,
+                                egui::Checkbox::new(&mut enabled, "Enabled"),
+                            )
+                            .changed()
+                        {
+                            self.start(Command::SetEnabled(
+                                item.settings.source.id.clone(),
+                                enabled,
+                            ));
+                        }
+                        ui.label(format!(
+                            "{} · {} entries",
+                            item.settings.source.title, item.count
+                        ));
                         let missing = item
+                            .settings
                             .source
                             .origin
                             .as_ref()
@@ -403,10 +451,31 @@ impl SourceManager {
                             ui.weak("Source file missing; local index remains available.");
                         }
                         if ui
+                            .add_enabled(!self.busy && index > 0, egui::Button::new("↑"))
+                            .clicked()
+                        {
+                            self.start(Command::MovePriority(
+                                item.settings.source.id.clone(),
+                                -1,
+                            ));
+                        }
+                        if ui
+                            .add_enabled(
+                                !self.busy && index + 1 < self.indexed.len(),
+                                egui::Button::new("↓"),
+                            )
+                            .clicked()
+                        {
+                            self.start(Command::MovePriority(
+                                item.settings.source.id.clone(),
+                                1,
+                            ));
+                        }
+                        if ui
                             .add_enabled(!self.busy, egui::Button::new("Remove local index"))
                             .clicked()
                         {
-                            self.start(Command::Remove(item.source.id.clone()));
+                            self.start(Command::Remove(item.settings.source.id.clone()));
                         }
                     });
                 }

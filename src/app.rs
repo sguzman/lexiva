@@ -245,6 +245,16 @@ impl eframe::App for LexivaApp {
                         self.scope = SearchScope::Unselected;
                     }
                 }
+                ManagerChange::Preferences(id) => {
+                    if self.scope == SearchScope::Source(id.clone())
+                        && !self
+                            .manager
+                            .as_ref()
+                            .is_some_and(|manager| manager.is_enabled(&id))
+                    {
+                        self.scope = SearchScope::Unselected;
+                    }
+                }
             }
             self.dispatch_search();
         }

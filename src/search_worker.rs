@@ -97,7 +97,7 @@ impl SearchWorker {
                     }
                     worker_active.store(request.serial, Ordering::Release);
                     let (sources, hits, suggestions, error) = match &connection {
-                        Ok(store) => match store.list_sources() {
+                        Ok(store) => match store.list_enabled_sources() {
                             Ok(sources) => {
                                 let filters = SearchFilters {
                                     source_id: match &request.scope {
