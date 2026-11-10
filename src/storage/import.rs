@@ -272,7 +272,8 @@ mod tests {
         {
             let mut first = DictionaryStore::open(&path).unwrap();
             first.upsert_source(&source("words")).unwrap();
-            first.replace_source_entries("words", &[entry(999, "words")])
+            first
+                .replace_source_entries("words", &[entry(999, "words")])
                 .unwrap();
             // Simulate a process that dies between committed batches and
             // does not run ImportSession::drop.
