@@ -2,8 +2,12 @@
 //! Scanning and indexing run on a background worker, never in egui's paint.
 //! Original DICT and Wiktextract files are always opened read-only.
 
-use std::io;
+use std::fs::File;
+use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
+
+use serde_json::json;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -27,6 +31,8 @@ pub struct DiscoveredDict {
 
 enum Command {
     Scan(Option<PathBuf>),
+    Refresh,
+    Reindex(String),
     ImportDict(Box<DiscoveredDict>),
     Remove(String),
     SetEnabled(String, bool),
@@ -49,6 +55,89 @@ pub enum ManagerChange {
 struct IndexedSource {
     settings: SourceSettings,
     count: i64,
+    health: SourceHealth,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SourceHealth {
+    UpToDate,
+    Changed,
+    Missing,
+    Unverified,
+}
+
+impl SourceHealth {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::UpToDate => "Up to date",
+            Self::Changed => "Source changed — reindex",
+            Self::Missing => "Source file missing — cached index retained",
+            Self::Unverified => "Not yet verified — reindex",
+        }
+    }
+}
+
+/// A bounded signature: size + high-resolution modification time + sampled
+/// first/last 8 KiB of both DICT files (or the selected JSONL). This detects
+/// typical package changes without scanning a multi-gigabyte corpus.
+fn file_signature(path: &Path) -> io::Result<String> {
+    let mut file = File::open(path)?;
+    let info = file.metadata()?;
+    let modified = info.modified()?.duration_since(UNIX_EPOCH).unwrap_or_default();
+    let mut hash = 0xcbf29ce484222325_u64;
+    for position in [0, info.len().saturating_sub(8192)] {
+        file.seek(SeekFrom::Start(position))?;
+        let mut content = Vec::with_capacity(8192);
+        file.by_ref().take(8192).read_to_end(&mut content)?;
+        for byte in content {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+    }
+    Ok(format!("{}:{}:{hash:016x}", info.len(), modified.as_nanos()))
+}
+
+fn source_signature(source: &DictionarySource) -> io::Result<String> {
+    let origin = source
+        .origin
+        .as_deref()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "missing source path"))?;
+    let first = file_signature(Path::new(origin))?;
+    if source.format == crate::model::SourceFormat::Dict {
+        let data = source.metadata["dict"]["data_path"]
+            .as_str()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "missing DICT data path"))?;
+        Ok(format!("{first}|{}", file_signature(Path::new(data))?))
+    } else {
+        Ok(first)
+    }
+}
+
+fn source_health(source: &DictionarySource) -> SourceHealth {
+    match source_signature(source) {
+        Err(_) => SourceHealth::Missing,
+        Ok(actual) => match source.metadata["import_signature"].as_str() {
+            None => SourceHealth::Unverified,
+            Some(stored) if stored == actual => SourceHealth::UpToDate,
+            Some(_) => SourceHealth::Changed,
+        },
+    }
+}
+
+fn record_signature(
+    store: &mut DictionaryStore,
+    source_id: &str,
+    signature: String,
+) -> Result<(), String> {
+    let mut source = store
+        .get_source(source_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "source disappeared during import".to_owned())?;
+    if !source.metadata.is_object() {
+        source.metadata = json!({});
+    }
+    source.metadata["import_signature"] = json!(signature);
+    store.upsert_source(&source).map_err(|error| error.to_string())
 }
 
 enum Event {
@@ -117,7 +206,12 @@ fn indexed_catalog(store: &DictionaryStore) -> Result<Vec<IndexedSource>, String
             let count = store
                 .count_entries(&settings.source.id)
                 .map_err(|error| error.to_string())?;
-            Ok(IndexedSource { settings, count })
+            let health = source_health(&settings.source);
+            Ok(IndexedSource {
+                settings,
+                count,
+                health,
+            })
         })
         .collect()
 }
@@ -128,12 +222,13 @@ fn import_dict(
     cancel: &AtomicBool,
     tx: &Sender<Event>,
 ) -> Result<usize, String> {
+    let signature = source_signature(&candidate.source).map_err(|error| error.to_string())?;
     let reader =
         DictReader::open(&candidate.source, &candidate.files).map_err(|error| error.to_string())?;
     store
         .upsert_source(&candidate.source)
         .map_err(|error| error.to_string())?;
-    store
+    let count = store
         .import_stream(
             &candidate.source.id,
             reader,
@@ -142,7 +237,9 @@ fn import_dict(
                 let _ = tx.send(Event::Progress(count));
             },
         )
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    record_signature(store, &candidate.source.id, signature)?;
+    Ok(count)
 }
 
 fn import_jsonl(
@@ -167,6 +264,7 @@ fn import_jsonl(
         word_language,
     )
     .map_err(|error| error.to_string())?;
+    let signature = source_signature(&source).map_err(|error| error.to_string())?;
     let reader =
         WiktextractReader::open(path, &source, edition).map_err(|error| error.to_string())?;
     store
@@ -182,7 +280,71 @@ fn import_jsonl(
             },
         )
         .map_err(|error| error.to_string())?;
+    record_signature(store, &id, signature)?;
     Ok((id, count))
+}
+
+fn reindex(
+    store: &mut DictionaryStore,
+    source_id: &str,
+    cancel: &AtomicBool,
+    tx: &Sender<Event>,
+) -> Result<usize, String> {
+    let source = store
+        .get_source(source_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "dictionary is not indexed".to_owned())?;
+    match source.format {
+        crate::model::SourceFormat::Dict => {
+            let path = source
+                .origin
+                .as_ref()
+                .ok_or_else(|| "missing DICT index path".to_owned())?;
+            let data = source.metadata["dict"]["data_path"]
+                .as_str()
+                .ok_or_else(|| "missing DICT data path".to_owned())?;
+            let files = DictFiles {
+                index: PathBuf::from(path),
+                data: PathBuf::from(data),
+                compressed: source.metadata["dict"]["compression"] == "dictzip",
+            };
+            import_dict(
+                store,
+                &DiscoveredDict {
+                    source,
+                    files,
+                    indexed_entries: 0,
+                },
+                cancel,
+                tx,
+            )
+        }
+        crate::model::SourceFormat::Wiktextract => {
+            let path = source
+                .origin
+                .as_ref()
+                .ok_or_else(|| "missing JSONL path".to_owned())?
+                .clone();
+            let edition = match source.definition_language.as_deref() {
+                Some("en") => WiktionaryEdition::English,
+                Some("es") => WiktionaryEdition::Spanish,
+                _ => return Err("unsupported Wiktionary edition".into()),
+            };
+            let (id, count) = import_jsonl(
+                store,
+                Path::new(&path),
+                edition,
+                source.headword_language.as_deref(),
+                cancel,
+                tx,
+            )?;
+            if id != source_id {
+                return Err("source ID changed; existing index was not replaced".into());
+            }
+            Ok(count)
+        }
+        _ => Err("reindexing this dictionary format is not supported yet".into()),
+    }
 }
 
 pub struct SourceManager {
@@ -224,6 +386,14 @@ impl SourceManager {
                 }
                 while let Ok(command) = incoming.recv() {
                     let result = match command {
+                        Command::Refresh => Ok(None),
+                        Command::Reindex(id) => reindex(
+                            &mut store,
+                            &id,
+                            &worker_cancel,
+                            &outgoing,
+                        )
+                        .map(|count| Some((id, count))),
                         Command::Scan(path) => match scan(&store, path.as_deref()) {
                             Ok(found) => {
                                 let _ = outgoing.send(Event::Found(found));
@@ -421,7 +591,15 @@ impl SourceManager {
                     ui.small(candidate.files.index.display().to_string());
                 }
                 ui.separator();
-                ui.strong("Indexed dictionary sources");
+                ui.horizontal(|ui| {
+                    ui.strong("Indexed dictionary sources");
+                    if ui
+                        .add_enabled(!self.busy, egui::Button::new("Check source files"))
+                        .clicked()
+                    {
+                        self.start(Command::Refresh);
+                    }
+                });
                 for (index, item) in self.indexed.clone().into_iter().enumerate() {
                     ui.horizontal_wrapped(|ui| {
                         let mut enabled = item.settings.enabled;
@@ -441,14 +619,15 @@ impl SourceManager {
                             "{} · {} entries",
                             item.settings.source.title, item.count
                         ));
-                        let missing = item
-                            .settings
-                            .source
-                            .origin
-                            .as_ref()
-                            .is_some_and(|path| !Path::new(path).exists());
-                        if missing {
-                            ui.weak("Source file missing; local index remains available.");
+                        ui.weak(item.health.label());
+                        if ui
+                            .add_enabled(
+                                !self.busy && item.health != SourceHealth::Missing,
+                                egui::Button::new("Reindex"),
+                            )
+                            .clicked()
+                        {
+                            self.start(Command::Reindex(item.settings.source.id.clone()));
                         }
                         if ui
                             .add_enabled(!self.busy && index > 0, egui::Button::new("↑"))
