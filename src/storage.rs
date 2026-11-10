@@ -39,7 +39,9 @@ impl fmt::Display for StoreError {
                     "unsupported database schema version {version}; Lexiva supports v1 and v2"
                 )
             }
-            Self::Integrity(details) => write!(f, "dictionary catalog integrity check failed: {details}"),
+            Self::Integrity(details) => {
+                write!(f, "dictionary catalog integrity check failed: {details}")
+            }
             Self::Cancelled => write!(f, "dictionary import cancelled"),
             Self::EmptyImport => write!(f, "refusing to publish an empty dictionary import"),
         }
@@ -106,7 +108,10 @@ impl DictionaryStore {
     /// This does not erase dictionary sources or normalized lexical records.
     pub fn rebuild_fts_index(&mut self) -> Result<()> {
         let tx = self.conn.transaction()?;
-        tx.execute("INSERT INTO lexical_fts(lexical_fts) VALUES ('rebuild')", [])?;
+        tx.execute(
+            "INSERT INTO lexical_fts(lexical_fts) VALUES ('rebuild')",
+            [],
+        )?;
         tx.commit()?;
         Ok(())
     }

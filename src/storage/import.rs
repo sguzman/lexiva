@@ -114,7 +114,9 @@ impl ImportSession<'_> {
     /// rows survive a batch failure until this session is dropped/discarded.
     pub fn stage_batch(&mut self, entries: &[LexicalEntry]) -> Result<()> {
         if entries.len() > MAX_IMPORT_BATCH {
-            return Err(StoreError::Invalid("import batch exceeds configured maximum"));
+            return Err(StoreError::Invalid(
+                "import batch exceeds configured maximum",
+            ));
         }
         let source = self
             .store
@@ -139,8 +141,14 @@ impl ImportSession<'_> {
                     entry.source_id,
                     entry.source_entry_id,
                     entry.lemma,
-                    entry.headword_language.as_deref().or(source.headword_language.as_deref()),
-                    entry.definition_language.as_deref().or(source.definition_language.as_deref()),
+                    entry
+                        .headword_language
+                        .as_deref()
+                        .or(source.headword_language.as_deref()),
+                    entry
+                        .definition_language
+                        .as_deref()
+                        .or(source.definition_language.as_deref()),
                     entry.part_of_speech,
                     payload,
                 ],
@@ -338,12 +346,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(db.count_entries("words").unwrap(), 1);
         assert_eq!(db.staged_count("words").unwrap(), 0);
-        let result = db.import_stream(
-            "words",
-            std::iter::empty(),
-            || false,
-            |_| {},
-        );
+        let result = db.import_stream("words", std::iter::empty(), || false, |_| {});
         assert!(matches!(result, Err(StoreError::EmptyImport)));
         assert_eq!(db.get_entry("words", "999").unwrap().is_some());
     }
@@ -369,7 +372,10 @@ mod tests {
         db.replace_source_entries("words", &[entry(999, "words")])
             .unwrap();
         db.conn
-            .execute("INSERT INTO staging_imports (source_id) VALUES ('words')", [])
+            .execute(
+                "INSERT INTO staging_imports (source_id) VALUES ('words')",
+                [],
+            )
             .unwrap();
         db.conn
             .execute(
@@ -391,9 +397,7 @@ mod tests {
         let mut db = DictionaryStore::in_memory().unwrap();
         db.upsert_source(&source("words")).unwrap();
         let mut session = db.begin_import("words").unwrap();
-        let too_many: Vec<_> = (0..=MAX_IMPORT_BATCH)
-            .map(|i| entry(i, "words"))
-            .collect();
+        let too_many: Vec<_> = (0..=MAX_IMPORT_BATCH).map(|i| entry(i, "words")).collect();
         assert!(matches!(
             session.stage_batch(&too_many),
             Err(StoreError::Invalid(_))

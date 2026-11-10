@@ -25,7 +25,8 @@ mod tests {
     #[test]
     fn migration_keeps_existing_v1_dictionary_metadata() {
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(include_str!("../schema_v1.sql")).unwrap();
+        conn.execute_batch(include_str!("../schema_v1.sql"))
+            .unwrap();
         let serialized = serde_json::to_string(&source()).unwrap();
         conn.execute(
             "INSERT INTO dictionary_sources (id, payload) VALUES ('legacy', ?1)",
@@ -45,9 +46,11 @@ mod tests {
         assert_eq!(store.get_source("legacy").unwrap(), Some(source()));
         assert_eq!(store.count_entries("legacy").unwrap(), 1);
         assert_eq!(
-            store.conn.query_row(
-                "SELECT count(*) FROM staging_imports", [], |row| row.get::<_, i64>(0)
-            ).unwrap(),
+            store
+                .conn
+                .query_row("SELECT count(*) FROM staging_imports", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
             0
         );
         store.check_fts_index().unwrap();
@@ -57,24 +60,33 @@ mod tests {
     fn rebuild_fts_recovers_live_entries() {
         let mut store = DictionaryStore::in_memory().unwrap();
         store.upsert_source(&source()).unwrap();
-        store.replace_source_entries("legacy", &[LexicalEntry {
-            source_id: "legacy".into(),
-            source_entry_id: "1".into(),
-            lemma: "árbol".into(),
-            headword_language: Some("es".into()),
-            definition_language: Some("en".into()),
-            part_of_speech: None,
-            senses: vec![],
-            pronunciations: vec![],
-            etymologies: vec![],
-            forms: vec![],
-            relations: vec![],
-            metadata: Value::Null,
-        }]).unwrap();
+        store
+            .replace_source_entries(
+                "legacy",
+                &[LexicalEntry {
+                    source_id: "legacy".into(),
+                    source_entry_id: "1".into(),
+                    lemma: "árbol".into(),
+                    headword_language: Some("es".into()),
+                    definition_language: Some("en".into()),
+                    part_of_speech: None,
+                    senses: vec![],
+                    pronunciations: vec![],
+                    etymologies: vec![],
+                    forms: vec![],
+                    relations: vec![],
+                    metadata: Value::Null,
+                }],
+            )
+            .unwrap();
         assert_eq!(store.search_prefix("arb", None, 10).unwrap().len(), 1);
-        store.conn.execute(
-            "INSERT INTO lexical_fts(lexical_fts) VALUES ('delete-all')", [],
-        ).unwrap();
+        store
+            .conn
+            .execute(
+                "INSERT INTO lexical_fts(lexical_fts) VALUES ('delete-all')",
+                [],
+            )
+            .unwrap();
         assert!(store.check_fts_index().is_err());
         store.rebuild_fts_index().unwrap();
         store.check_fts_index().unwrap();
