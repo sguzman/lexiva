@@ -177,7 +177,7 @@ impl DictionaryStore {
         }
         // The SQL order is source-priority then spelling; stable sort keeps
         // that order within the two exact/prefix relevance groups.
-        collected.sort_by(|left, right| right.exact.cmp(&left.exact));
+        collected.sort_by_key(|hit| std::cmp::Reverse(hit.exact));
         collected.truncate(limit.min(MAX_SEARCH_HITS));
         Ok(collected)
     }
