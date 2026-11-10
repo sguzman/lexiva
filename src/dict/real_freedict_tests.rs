@@ -2,8 +2,8 @@
 //! Ubuntu's FreeDict spa-eng and eng-spa data packages. None is bundled.
 
 use super::*;
-use std::path::PathBuf;
 use crate::storage::DictionaryStore;
+use std::path::PathBuf;
 use std::process::Command;
 
 #[test]
