@@ -6,6 +6,7 @@ use eframe::egui;
 
 use crate::model::DictionarySource;
 use crate::reader;
+use crate::source_manager::SourceManager;
 use crate::search_worker::{self, SearchScope, SearchWorker};
 use crate::storage::SearchHit;
 use crate::theme::{self, ThemeChoice};
@@ -76,6 +77,7 @@ pub struct LexivaApp {
     query: String,
     scope: SearchScope,
     worker: Option<SearchWorker>,
+    manager: Option<SourceManager>,
     serial: u64,
     pending: bool,
     sources: Vec<DictionarySource>,
@@ -96,12 +98,26 @@ impl LexivaApp {
             .unwrap_or_default();
         theme.apply(&cc.egui_ctx);
 
-        let (worker, error) = match search_worker::catalog_path() {
-            Ok(path) => match SearchWorker::spawn(path, &cc.egui_ctx) {
-                Ok(worker) => (Some(worker), None),
-                Err(error) => (None, Some(format!("Could not start search: {error}"))),
-            },
+        let (worker, manager, error) = match search_worker::catalog_path() {
+            Ok(path) => {
+                // Initialize the new catalog once before independent search
+                // and import connections race to create its schema.
+                match crate::storage::DictionaryStore::open(&path) {
+                    Ok(_) => {
+                        let search = SearchWorker::spawn(path.clone(), &cc.egui_ctx);
+                        let import = SourceManager::spawn(path, &cc.egui_ctx);
+                        match (search, import) {
+                            (Ok(search), Ok(import)) => (Some(search), Some(import), None),
+                            (Err(error), _) | (_, Err(error)) => {
+                                (None, None, Some(format!("Could not start workers: {error}")))
+                            }
+                        }
+                    }
+                    Err(error) => (None, None, Some(error.to_string())),
+                }
+            }
             Err(error) => (
+                None,
                 None,
                 Some(format!("Could not open catalog folder: {error}")),
             ),
@@ -111,6 +127,7 @@ impl LexivaApp {
             query: String::new(),
             scope: SearchScope::Unselected,
             worker,
+            manager,
             serial: 0,
             pending: false,
             sources: Vec::new(),
@@ -207,6 +224,11 @@ impl LexivaApp {
 impl eframe::App for LexivaApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.receive_updates();
+        let indexed = self.manager.as_mut().and_then(SourceManager::poll);
+        if let Some(id) = indexed {
+            self.scope = SearchScope::Source(id);
+            self.dispatch_search();
+        }
 
         ui.add_space(10.0);
         ui.horizontal(|ui| {
@@ -229,6 +251,11 @@ impl eframe::App for LexivaApp {
             });
         });
         ui.separator();
+
+        if let Some(manager) = &mut self.manager {
+            manager.show(ui);
+        }
+        ui.add_space(6.0);
 
         ui.horizontal(|ui| {
             ui.label("Dictionary");

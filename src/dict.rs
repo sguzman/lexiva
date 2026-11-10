@@ -3,7 +3,7 @@
 //! A .index line is: headword TAB base64(offset) TAB base64(length) LF.
 //! Offsets and lengths refer to bytes in the *uncompressed* .dict data.
 mod dictzip;
-mod metadata;
+pub(crate) mod metadata;
 
 #[cfg(test)]
 mod real_freedict_tests;

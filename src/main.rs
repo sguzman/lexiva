@@ -1,6 +1,7 @@
 mod app;
 mod reader;
 mod search_worker;
+mod source_manager;
 // Early backend adapter, not yet linked to the GUI.
 #[allow(dead_code)]
 mod dict;
