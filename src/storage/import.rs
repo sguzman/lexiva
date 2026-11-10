@@ -348,7 +348,7 @@ mod tests {
         assert_eq!(db.staged_count("words").unwrap(), 0);
         let result = db.import_stream("words", std::iter::empty(), || false, |_| {});
         assert!(matches!(result, Err(StoreError::EmptyImport)));
-        assert_eq!(db.get_entry("words", "999").unwrap().is_some());
+        assert!(db.get_entry("words", "999").unwrap().is_some());
     }
 
     #[test]
