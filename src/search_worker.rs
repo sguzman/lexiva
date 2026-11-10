@@ -367,10 +367,16 @@ mod tests {
             SearchScope::All,
             SearchScope::Source("dict:spa-eng:/usr/share/dictd".to_owned()),
         ] {
-            assert_eq!(SearchScope::from_storage_value(&scope.storage_value()), scope);
+            assert_eq!(
+                SearchScope::from_storage_value(&scope.storage_value()),
+                scope
+            );
         }
         for invalid in ["", "invalid", "source:", "ALL", "all indexed dictionaries"] {
-            assert_eq!(SearchScope::from_storage_value(invalid), SearchScope::Unselected);
+            assert_eq!(
+                SearchScope::from_storage_value(invalid),
+                SearchScope::Unselected
+            );
         }
     }
 
