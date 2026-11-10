@@ -8,6 +8,9 @@ mod model;
 #[allow(dead_code)]
 mod storage;
 mod theme;
+// Streaming Wiktextract adapter; GUI integration belongs to M05/M06.
+#[allow(dead_code)]
+mod wiktextract;
 
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
