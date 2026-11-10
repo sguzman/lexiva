@@ -79,32 +79,37 @@ impl DarkmanWatcher {
         {
             let runtime = std::env::var_os("XDG_RUNTIME_DIR")?;
             let path = std::path::PathBuf::from(runtime).join("darkman/control.sock");
-            let mut stream = UnixStream::connect(path).ok()?;
-            stream.write_all(b"watch\n").ok()?;
-            let (send, updates) = std::sync::mpsc::channel();
-            let ctx = ctx.clone();
-            std::thread::Builder::new()
-                .name("lexiva-darkman".into())
-                .spawn(move || {
-                    for line in BufReader::new(stream).lines() {
-                        let Ok(line) = line else { break };
-                        let Some(mode) = ThemeChoice::from_darkman_message(&line) else {
-                            continue;
-                        };
-                        if send.send(mode).is_err() {
-                            break;
-                        }
-                        ctx.request_repaint();
-                    }
-                })
-                .ok()?;
-            Some(Self { updates })
+            let stream = UnixStream::connect(path).ok()?;
+            Self::from_stream(stream, ctx)
         }
         #[cfg(not(target_os = "linux"))]
         {
             let _ = ctx;
             None
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn from_stream(mut stream: UnixStream, ctx: &egui::Context) -> Option<Self> {
+        stream.write_all(b"watch\n").ok()?;
+        let (send, updates) = std::sync::mpsc::channel();
+        let ctx = ctx.clone();
+        std::thread::Builder::new()
+            .name("lexiva-darkman".into())
+            .spawn(move || {
+                for line in BufReader::new(stream).lines() {
+                    let Ok(line) = line else { break };
+                    let Some(mode) = ThemeChoice::from_darkman_message(&line) else {
+                        continue;
+                    };
+                    if send.send(mode).is_err() {
+                        break;
+                    }
+                    ctx.request_repaint();
+                }
+            })
+            .ok()?;
+        Some(Self { updates })
     }
 
     /// Coalesce quick manual mode toggles; only the newest one is visible.
@@ -201,6 +206,40 @@ mod tests {
         );
         for input in ["", "toggle", "system", "red", "unknown"] {
             assert_eq!(ThemeChoice::from_darkman_message(input), None);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn darkman_socket_watch_delivers_initial_and_changed_modes() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::net::UnixStream;
+        use std::time::{Duration, Instant};
+
+        use super::DarkmanWatcher;
+
+        let (client, mut server) = UnixStream::pair().unwrap();
+        server.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        let watcher = DarkmanWatcher::from_stream(client, &egui::Context::default()).unwrap();
+        let mut command = String::new();
+        BufReader::new(server.try_clone().unwrap())
+            .read_line(&mut command)
+            .unwrap();
+        assert_eq!(command, "watch\n");
+
+        for (message, expected) in [
+            (b"dark\n".as_slice(), ThemeChoice::Dark),
+            (b"light\n".as_slice(), ThemeChoice::Light),
+        ] {
+            server.write_all(message).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(2);
+            loop {
+                if watcher.latest() == Some(expected) {
+                    break;
+                }
+                assert!(Instant::now() < deadline, "Darkman notification not received");
+                std::thread::sleep(Duration::from_millis(5));
+            }
         }
     }
 
