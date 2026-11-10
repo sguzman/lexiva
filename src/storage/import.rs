@@ -9,6 +9,43 @@ use super::{DictionaryStore, LexicalEntry, Result, StoreError};
 pub const MAX_IMPORT_BATCH: usize = 128;
 pub const MAX_ENTRY_BYTES: usize = 4 * 1024 * 1024;
 
+/// Limit the serialized size *before* admitting an entry into the pending
+/// batch. Count bytes without constructing a second giant JSON allocation.
+struct LimitedCounter {
+    bytes: usize,
+    exceeded: bool,
+}
+
+impl std::io::Write for LimitedCounter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if buf.len() > MAX_ENTRY_BYTES.saturating_sub(self.bytes) {
+            self.exceeded = true;
+            return Err(std::io::Error::other("dictionary entry exceeds size limit"));
+        }
+        self.bytes += buf.len();
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn ensure_entry_size(entry: &LexicalEntry) -> Result<()> {
+    let mut counter = LimitedCounter {
+        bytes: 0,
+        exceeded: false,
+    };
+    if let Err(error) = serde_json::to_writer(&mut counter, entry) {
+        if counter.exceeded {
+            return Err(StoreError::Invalid("dictionary entry exceeds size limit"));
+        }
+        return Err(StoreError::Json(error));
+    }
+    Ok(())
+}
+
+
 /// Owns a single dictionary's staging lease on a DictionaryStore connection.
 /// Dropping it cleans up normally; a process crash may leave staging rows,
 /// but they cannot affect live searches or be published implicitly.
@@ -84,7 +121,10 @@ impl DictionaryStore {
             if cancelled() {
                 return Err(StoreError::Cancelled);
             }
-            batch.push(item?);
+            let entry = item?;
+            entry.validate().map_err(StoreError::Invalid)?;
+            ensure_entry_size(&entry)?;
+            batch.push(entry);
             if batch.len() == MAX_IMPORT_BATCH {
                 import.stage_batch(&batch)?;
                 batch.clear();
@@ -128,6 +168,7 @@ impl ImportSession<'_> {
             if entry.source_id != self.source_id {
                 return Err(StoreError::Invalid("entry belongs to a different source"));
             }
+            ensure_entry_size(entry)?;
             let payload = serde_json::to_string(entry)?;
             if payload.len() > MAX_ENTRY_BYTES {
                 return Err(StoreError::Invalid("import entry exceeds size limit"));
@@ -452,6 +493,21 @@ mod tests {
         assert!(!db.discard_staged_import("words").unwrap());
         assert_eq!(db.staged_count("words").unwrap(), 0);
         assert_eq!(db.count_entries("words").unwrap(), 1);
+    }
+
+    #[test]
+    fn oversized_record_is_rejected_before_staging() {
+        let mut db = DictionaryStore::in_memory().unwrap();
+        db.upsert_source(&source("words")).unwrap();
+        db.replace_source_entries("words", &[entry(999, "words")])
+            .unwrap();
+        let mut oversized = entry(1, "words");
+        oversized.metadata = Value::String("x".repeat(MAX_ENTRY_BYTES));
+        let result = db.import_stream("words", [Ok(oversized)], || false, |_| {});
+        assert!(matches!(result, Err(StoreError::Invalid(_))));
+        assert_eq!(db.count_entries("words").unwrap(), 1);
+        assert_eq!(db.staged_count("words").unwrap(), 0);
+        assert!(db.get_entry("words", "999").unwrap().is_some());
     }
 
     #[test]
