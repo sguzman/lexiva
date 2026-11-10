@@ -11,6 +11,9 @@ use crate::model::{DictionarySource, LexicalEntry};
 pub const SCHEMA_VERSION: i64 = 2;
 
 mod import;
+mod search;
+
+pub use search::{SearchFilters, SearchHit};
 
 #[cfg(test)]
 mod migration_tests;
