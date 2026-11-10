@@ -4,7 +4,7 @@
 2. **UI boundaries:** Screen/navigation, source manager, language filters, typography and reader consume a format-neutral search API, not files directly.
 3. **Domain model:** Distinguish headword and definition language and allow unknowns. Keep ordered senses, POS, examples, forms, pronunciations, etymologies, references and original source metadata.
 4. **Adapters:** DICT, Wiktextract, StarDict and TEI readers independently validate untrusted input, size and offsets. Reject unsupported variants without partial index publication.
-5. **Storage:** Source IDs and provenance plus SQLite FTS5 indexes. Indexes derived/disposable; state and source manifests are valuable. Use XDG config/data/cache directories. The first shell may use eframe native persistence for theme only; move to deliberate XDG-owned state before release.
+5. **Storage:** Source IDs and provenance plus SQLite FTS5 indexes. Indexes derived/disposable; state and source manifests are valuable. Use XDG config/data/cache directories. Eframe native persistence now holds small appearance, zoom, selected-source/language and accessibility preferences plus root-window state, while SQLite under XDG data holds derived dictionary catalogs; review persistence paths during packaging.
 6. **Imports:** Streaming, cancelable background work with bounded memory, progress/errors, transactional staging and atomic publication, retaining the previous usable index if an import fails.
 7. **Source ownership:** Installed package files are read-only, never rewritten. Changes detected by fingerprint/rescan and safely reindexed. No dictd daemon mandatory.
 8. **Search:** Exact then prefix, normalized accents/case and bounded fuzzy suggestions, with explicit language/source filtering and deterministic ordering. No silent merging across sources.
@@ -33,6 +33,10 @@ The read-only `src/wiktextract.rs` adapter streams original JSONL/gzip records i
 ## Native system appearance (M07 in progress)
 
 On Linux with Darkman, the GUI subscribes to the existing `$XDG_RUNTIME_DIR/darkman/control.sock` `watch` stream. The initial state and each subsequent light/dark notification trigger egui repaint, but are only applied while Appearance is set to System. An explicit Light or Dark choice is never overwritten. On machines without Darkman, normal eframe System behavior remains; native Hyprland verification and generic XDG portal integration remain outstanding. The watcher performs no idle polling and adds no crates or font redistribution.
+
+## Accessibility and window-state behavior (M07 active)
+
+The app stores a bounded reader-size preference and a separate interface zoom, retaining the framework's Ctrl+Plus/Minus/0 shortcuts. An Accessibility menu enables reduced-motion styles and high-contrast secondary and selection text while preserving Lexiva's accent colors. All appearance variants update both light and dark styles rather than only the active theme. Lookup history, arrow selection and Ctrl+Enter copying are gated by the focused control, preventing other text inputs from being hijacked. Eframe native root-window persistence and system font fallback are enabled explicitly; Wayland controls absolute positions. Unit-level tests verify focus gating and contrast ratios, but compositor behavior and graphical acceptance are still outstanding.
 
 ## Source preference persistence and file health (M06 complete to CI)
 
