@@ -243,6 +243,11 @@ impl DictionaryStore {
         )?)
     }
 
+    /// Thread-safe handle used by the UI worker to cancel a stale SQLite query.
+    pub fn interrupt_handle(&self) -> rusqlite::InterruptHandle {
+        self.conn.get_interrupt_handle()
+    }
+
     /// Basic source-scoped FTS prefix lookup. Language filters and ranking are
     /// separate search-engine work in M05/M06. Query syntax is always escaped.
     pub fn search_prefix(
