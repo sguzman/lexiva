@@ -32,3 +32,10 @@ jobs:
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Tests
         run: cargo test --locked --all-targets
+      - name: Install real FreeDict packages for independent source QA
+        run: |
+          sudo apt-get install -y --no-install-recommends dict-freedict-spa-eng dict-freedict-eng-spa gzip
+          test -s /usr/share/dictd/freedict-spa-eng.index
+          test -s /usr/share/dictd/freedict-eng-spa.index
+      - name: Test actual installed FreeDict dictionaries
+        run: cargo test --locked --all-targets -- --ignored --nocapture

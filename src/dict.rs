@@ -3,10 +3,16 @@
 //! A .index line is: headword TAB base64(offset) TAB base64(length) LF.
 //! Offsets and lengths refer to bytes in the *uncompressed* .dict data.
 mod dictzip;
+mod metadata;
+
+#[cfg(test)]
+mod real_freedict_tests;
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom};
+
+pub use metadata::{DictMetadata, inspect_metadata, source_from_files};
 use std::path::PathBuf;
 
 use serde_json::json;
@@ -228,20 +234,21 @@ impl DictReader {
                     self.line_no
                 )));
             }
-            // These are dictd administrative records, not dictionary words.
-            if row.lemma.starts_with("00-database-") {
+            // Dictd administrative records are source metadata, not headwords.
+            if row.lemma.starts_with("00-database-") || row.lemma == "00databaseshort" {
                 continue;
             }
             let bytes = self.data.read_at(row.start, row.length)?;
             let article =
                 String::from_utf8(bytes).map_err(|_| invalid("DICT article is not UTF-8"))?;
+            let part_of_speech = metadata::article_part_of_speech(&row.lemma, &article);
             return Ok(Some(LexicalEntry {
                 source_id: self.source_id.clone(),
                 source_entry_id: format!("index-line:{}", self.line_no),
                 lemma: row.lemma.to_owned(),
                 headword_language: self.headword_language.clone(),
                 definition_language: self.definition_language.clone(),
-                part_of_speech: None,
+                part_of_speech,
                 senses: vec![Sense {
                     number: None,
                     definition_language: self.definition_language.clone(),
@@ -258,6 +265,7 @@ impl DictReader {
                     "dict_index_line": self.line_no,
                     "dict_data_offset": row.start,
                     "dict_article_bytes": row.length,
+                    "dict_article_format": "plain_text_verbatim",
                 }),
             }));
         }
