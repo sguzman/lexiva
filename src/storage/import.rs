@@ -336,7 +336,10 @@ mod tests {
         }
 
         let mut reopened = DictionaryStore::open(&path).unwrap();
-        assert_eq!(reopened.schema_version().unwrap(), crate::storage::SCHEMA_VERSION);
+        assert_eq!(
+            reopened.schema_version().unwrap(),
+            crate::storage::SCHEMA_VERSION
+        );
         assert_eq!(reopened.count_entries("words").unwrap(), 1);
         assert_eq!(reopened.staged_count("words").unwrap(), 1);
         assert!(reopened.get_entry("words", "999").unwrap().is_some());
