@@ -8,7 +8,12 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::model::{DictionarySource, LexicalEntry};
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
+
+mod import;
+
+#[cfg(test)]
+mod migration_tests;
 const MAX_QUERY_RESULTS: usize = 100;
 
 #[derive(Debug)]
@@ -17,6 +22,9 @@ pub enum StoreError {
     Json(serde_json::Error),
     Invalid(&'static str),
     UnsupportedSchema(i64),
+    Integrity(String),
+    Cancelled,
+    EmptyImport,
 }
 
 impl fmt::Display for StoreError {
@@ -28,9 +36,12 @@ impl fmt::Display for StoreError {
             Self::UnsupportedSchema(version) => {
                 write!(
                     f,
-                    "database schema version {version} is newer than Lexiva supports"
+                    "unsupported database schema version {version}; Lexiva supports v1 and v2"
                 )
             }
+            Self::Integrity(details) => write!(f, "dictionary catalog integrity check failed: {details}"),
+            Self::Cancelled => write!(f, "dictionary import cancelled"),
+            Self::EmptyImport => write!(f, "refusing to publish an empty dictionary import"),
         }
     }
 }
@@ -68,10 +79,17 @@ impl DictionaryStore {
     fn initialize(conn: Connection) -> Result<Self> {
         conn.pragma_update(None, "foreign_keys", "ON")?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        // Avoid changing a database that is corrupt or from a future version.
+        if version > SCHEMA_VERSION || version < 0 {
+            return Err(StoreError::UnsupportedSchema(version));
+        }
+        let integrity: String = conn.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+        if integrity != "ok" {
+            return Err(StoreError::Integrity(integrity));
+        }
         match version {
-            0 => {
-                conn.execute_batch(include_str!("schema.sql"))?;
-            }
+            0 => conn.execute_batch(include_str!("schema.sql"))?,
+            1 => conn.execute_batch(include_str!("migration_v1_to_v2.sql"))?,
             SCHEMA_VERSION => (),
             other => return Err(StoreError::UnsupportedSchema(other)),
         }
@@ -82,6 +100,24 @@ impl DictionaryStore {
         Ok(self
             .conn
             .pragma_query_value(None, "user_version", |row| row.get(0))?)
+    }
+
+    /// Reconstruct a corrupted or out-of-sync *derived FTS index* from live entries.
+    /// This does not erase dictionary sources or normalized lexical records.
+    pub fn rebuild_fts_index(&mut self) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute("INSERT INTO lexical_fts(lexical_fts) VALUES ('rebuild')", [])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Perform the FTS5 content integrity check, not just SQLite's quick_check.
+    pub fn check_fts_index(&self) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO lexical_fts(lexical_fts, rank) VALUES ('integrity-check', 1)",
+            [],
+        )?;
+        Ok(())
     }
 
     pub fn upsert_source(&self, source: &DictionarySource) -> Result<()> {
@@ -108,10 +144,10 @@ impl DictionaryStore {
             .transpose()
     }
 
-    /// Atomically replace all indexed entries of a source.
+    /// Atomically replace all indexed entries of a source in one transaction.
     ///
-    /// This intentionally accepts a bounded batch. Large streaming imports
-    /// will use a separate staging table before publication (LEX-023).
+    /// For genuinely large corpora use import::ImportSession / import_stream,
+    /// which stage bounded batches and publish only after a complete import.
     pub fn replace_source_entries(
         &mut self,
         source_id: &str,

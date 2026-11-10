@@ -1,4 +1,5 @@
--- Version 1. The catalog is derived data; source files remain read-only.
+-- Version 2. Live entries remain separate from durable incomplete import batches.
+-- Original package-managed dictionary files are always read-only.
 BEGIN IMMEDIATE;
 CREATE TABLE dictionary_sources (
     id TEXT PRIMARY KEY NOT NULL,
@@ -35,5 +36,20 @@ CREATE TRIGGER entries_update AFTER UPDATE ON lexical_entries BEGIN
     VALUES ('delete', old.id, old.lemma);
     INSERT INTO lexical_fts(rowid, lemma) VALUES (new.id, new.lemma);
 END;
-PRAGMA user_version=1;
+-- Each source can have one pending staging session. A crash leaves only these
+-- disposable rows; live entries stay unchanged until an explicit publish.
+CREATE TABLE staging_imports (
+    source_id TEXT PRIMARY KEY NOT NULL REFERENCES dictionary_sources(id) ON DELETE CASCADE
+);
+CREATE TABLE staging_entries (
+    source_id TEXT NOT NULL REFERENCES staging_imports(source_id) ON DELETE CASCADE,
+    source_entry_id TEXT NOT NULL,
+    lemma TEXT NOT NULL,
+    headword_language TEXT,
+    definition_language TEXT,
+    part_of_speech TEXT,
+    payload TEXT NOT NULL,
+    PRIMARY KEY (source_id, source_entry_id)
+) WITHOUT ROWID;
+PRAGMA user_version=2;
 COMMIT;
