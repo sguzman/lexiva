@@ -599,7 +599,13 @@ mod tests {
                 .unwrap(),
             1
         );
-        assert_eq!(store.search_prefix("hou", Some(&source.id), 10).unwrap().len(), 1);
+        assert_eq!(
+            store
+                .search_prefix("hou", Some(&source.id), 10)
+                .unwrap()
+                .len(),
+            1
+        );
         store.check_fts_index().unwrap();
     }
 
