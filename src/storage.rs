@@ -282,7 +282,9 @@ mod tests {
         store
             .replace_source_entries("es-en", &[a.clone(), b.clone()])
             .unwrap();
-        store.replace_source_entries("es-es", std::slice::from_ref(&c)).unwrap();
+        store
+            .replace_source_entries("es-es", std::slice::from_ref(&c))
+            .unwrap();
         assert_eq!(store.count_entries("es-en").unwrap(), 2);
         assert_eq!(store.get_entry("es-en", "homograph:1").unwrap(), Some(a));
         assert_eq!(store.get_entry("es-en", "homograph:2").unwrap(), Some(b));
