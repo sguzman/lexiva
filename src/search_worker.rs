@@ -76,10 +76,10 @@ impl SearchWorker {
             .name("lexiva-search".to_owned())
             .spawn(move || {
                 let connection = DictionaryStore::open(&path);
-                if let Ok(store) = &connection {
-                    if let Ok(mut guard) = worker_interrupt.lock() {
-                        *guard = Some(store.interrupt_handle());
-                    }
+                if let Ok(store) = &connection
+                    && let Ok(mut guard) = worker_interrupt.lock()
+                {
+                    *guard = Some(store.interrupt_handle());
                 }
                 while let Ok(mut request) = request_rx.recv() {
                     // Only the newest pending keystroke matters, but an
@@ -186,12 +186,12 @@ impl SearchWorker {
         // statement; the worker discards old results, including interruptions.
         self.latest_serial.store(serial, Ordering::Release);
         let active = self.active_serial.load(Ordering::Acquire);
-        if active != 0 && active != serial {
-            if let Ok(guard) = self.interrupt.lock() {
-                if let Some(handle) = guard.as_ref() {
-                    handle.interrupt();
-                }
-            }
+        if active != 0
+            && active != serial
+            && let Ok(guard) = self.interrupt.lock()
+            && let Some(handle) = guard.as_ref()
+        {
+            handle.interrupt();
         }
         self.requests
             .send(SearchRequest {

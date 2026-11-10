@@ -281,14 +281,13 @@ impl eframe::App for LexivaApp {
         }
         let copy_shortcut =
             ui.input(|input| input.modifiers.ctrl && input.key_pressed(egui::Key::Enter));
-        if copy_shortcut {
-            if let Some(hit) = self
+        if copy_shortcut
+            && let Some(hit) = self
                 .selected
                 .as_ref()
                 .and_then(|selected| self.hits.iter().find(|hit| selected.matches(hit)))
-            {
-                ui.ctx().copy_text(reader::copy_text(hit));
-            }
+        {
+            ui.ctx().copy_text(reader::copy_text(hit));
         }
 
         // History is intentionally session-only for now. Ctrl+L focuses
