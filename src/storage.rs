@@ -175,7 +175,7 @@ impl DictionaryStore {
             .transpose()
     }
 
-    pub fn count_entries(&self, source_id: &str) -> Result<u64> {
+    pub fn count_entries(&self, source_id: &str) -> Result<i64> {
         Ok(self.conn.query_row(
             "SELECT count(*) FROM lexical_entries WHERE source_id = ?1",
             [source_id],
