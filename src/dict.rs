@@ -350,10 +350,10 @@ mod tests {
         let dirs = [fixture.0.clone(), fixture.0.clone()];
         let discovered = discover_in(&dirs).unwrap();
         assert_eq!(discovered.len(), 2);
-        assert_eq!(discovered[1], plain);
-        assert!(discovered[0].compressed);
+        assert_eq!(discovered[0], plain);
+        assert!(discovered[1].compressed);
         assert!(matches!(
-            DictReader::open(&source(), &discovered[0]),
+            DictReader::open(&source(), &discovered[1]),
             Err(error) if error.kind() == io::ErrorKind::Unsupported
         ));
     }
