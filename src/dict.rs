@@ -12,7 +12,6 @@ use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom};
 
-pub use metadata::{DictMetadata, inspect_metadata, source_from_files};
 use std::path::PathBuf;
 
 use serde_json::json;
@@ -241,7 +240,7 @@ impl DictReader {
             let bytes = self.data.read_at(row.start, row.length)?;
             let article =
                 String::from_utf8(bytes).map_err(|_| invalid("DICT article is not UTF-8"))?;
-            let part_of_speech = metadata::article_part_of_speech(&row.lemma, &article);
+            let part_of_speech = metadata::article_part_of_speech(row.lemma, &article);
             return Ok(Some(LexicalEntry {
                 source_id: self.source_id.clone(),
                 source_entry_id: format!("index-line:{}", self.line_no),

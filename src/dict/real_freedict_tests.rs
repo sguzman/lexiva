@@ -20,7 +20,7 @@ fn installed_freedict_packages_agree_with_independent_gzip() {
             .find(|f| f.index.file_stem().is_some_and(|s| s == base))
             .unwrap_or_else(|| panic!("missing installed FreeDict package {base}"));
         assert!(files.compressed, "{base} should be a .dict.dz package");
-        let source = source_from_files(files, base).unwrap();
+        let source = metadata::source_from_files(files, base).unwrap();
         assert_eq!(source.headword_language.as_deref(), Some(from));
         assert_eq!(source.definition_language.as_deref(), Some(to));
         assert_eq!(source.format, crate::model::SourceFormat::Dict);
