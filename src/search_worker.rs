@@ -42,6 +42,8 @@ struct SearchRequest {
     serial: u64,
     query: String,
     scope: SearchScope,
+    headword_language: Option<String>,
+    definition_language: Option<String>,
 }
 
 pub struct SearchUpdate {
@@ -97,22 +99,20 @@ impl SearchWorker {
                     let (sources, hits, suggestions, error) = match &connection {
                         Ok(store) => match store.list_sources() {
                             Ok(sources) => {
-                                let result = match &request.scope {
-                                    SearchScope::Unselected => Ok(Vec::new()),
-                                    _ if request.query.trim().is_empty() => Ok(Vec::new()),
-                                    SearchScope::All => store.search_ranked(
-                                        &request.query,
-                                        SearchFilters::default(),
-                                        RESULT_LIMIT,
-                                    ),
-                                    SearchScope::Source(id) => store.search_ranked(
-                                        &request.query,
-                                        SearchFilters {
-                                            source_id: Some(id),
-                                            ..SearchFilters::default()
-                                        },
-                                        RESULT_LIMIT,
-                                    ),
+                                let filters = SearchFilters {
+                                    source_id: match &request.scope {
+                                        SearchScope::Source(id) => Some(id.as_str()),
+                                        _ => None,
+                                    },
+                                    headword_language: request.headword_language.as_deref(),
+                                    definition_language: request.definition_language.as_deref(),
+                                };
+                                let result = if request.scope == SearchScope::Unselected
+                                    || request.query.trim().is_empty()
+                                {
+                                    Ok(Vec::new())
+                                } else {
+                                    store.search_ranked(&request.query, filters, RESULT_LIMIT)
                                 };
                                 match result {
                                     Ok(hits) => {
@@ -120,13 +120,6 @@ impl SearchWorker {
                                             && !request.query.trim().is_empty()
                                             && request.scope != SearchScope::Unselected
                                         {
-                                            let filters = match &request.scope {
-                                                SearchScope::Source(id) => SearchFilters {
-                                                    source_id: Some(id),
-                                                    ..SearchFilters::default()
-                                                },
-                                                _ => SearchFilters::default(),
-                                            };
                                             store.suggest_words(&request.query, filters, 5)
                                         } else {
                                             Ok(Vec::new())
@@ -181,7 +174,14 @@ impl SearchWorker {
         })
     }
 
-    pub fn submit(&self, serial: u64, query: &str, scope: &SearchScope) -> Result<(), String> {
+    pub fn submit(
+        &self,
+        serial: u64,
+        query: &str,
+        scope: &SearchScope,
+        headword_language: &str,
+        definition_language: &str,
+    ) -> Result<(), String> {
         // Advertise the new generation before interrupting the old SQLite
         // statement; the worker discards old results, including interruptions.
         self.latest_serial.store(serial, Ordering::Release);
@@ -198,6 +198,8 @@ impl SearchWorker {
                 serial,
                 query: query.to_owned(),
                 scope: scope.clone(),
+                headword_language: optional_language(headword_language),
+                definition_language: optional_language(definition_language),
             })
             .map_err(|_| "Dictionary search worker has stopped".to_owned())
     }
@@ -209,6 +211,11 @@ impl SearchWorker {
         }
         newest
     }
+}
+
+fn optional_language(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_owned())
 }
 
 fn catalog_path_for(xdg: Option<&Path>, home: Option<&Path>) -> io::Result<PathBuf> {
@@ -307,8 +314,8 @@ mod tests {
         let context = egui::Context::default();
         let worker = SearchWorker::spawn(path.clone(), &context).unwrap();
         let scope = SearchScope::Source("test".to_owned());
-        worker.submit(1, "missing", &scope).unwrap();
-        worker.submit(2, "cas", &scope).unwrap();
+        worker.submit(1, "missing", &scope, "es", "en").unwrap();
+        worker.submit(2, "cas", &scope, "es", "en").unwrap();
         let deadline = Instant::now() + Duration::from_secs(5);
         let update = loop {
             if let Some(update) = worker.poll()
@@ -325,6 +332,13 @@ mod tests {
         assert!(update.error.is_none());
         drop(worker);
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn language_filter_inputs_are_independent_and_optional() {
+        assert_eq!(optional_language(""), None);
+        assert_eq!(optional_language("  es  "), Some("es".to_owned()));
+        assert_eq!(optional_language("en"), Some("en".to_owned()));
     }
 
     #[test]

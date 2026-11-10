@@ -75,6 +75,8 @@ impl SearchHistory {
 pub struct LexivaApp {
     theme: ThemeChoice,
     query: String,
+    headword_language: String,
+    definition_language: String,
     scope: SearchScope,
     worker: Option<SearchWorker>,
     manager: Option<SourceManager>,
@@ -127,6 +129,8 @@ impl LexivaApp {
         let mut app = Self {
             theme,
             query: String::new(),
+            headword_language: String::new(),
+            definition_language: String::new(),
             scope: SearchScope::Unselected,
             worker,
             manager,
@@ -149,7 +153,13 @@ impl LexivaApp {
         self.suggestions.clear();
         self.selected = None;
         if let Some(worker) = &self.worker {
-            match worker.submit(self.serial, &self.query, &self.scope) {
+            match worker.submit(
+                self.serial,
+                &self.query,
+                &self.scope,
+                &self.headword_language,
+                &self.definition_language,
+            ) {
                 Ok(()) => {
                     self.pending = true;
                     self.error = None;
@@ -294,6 +304,24 @@ impl eframe::App for LexivaApp {
                 self.dispatch_search();
             }
             ui.weak(format!("{} indexed sources", self.sources.len()));
+        });
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Word language");
+            let word = ui.add(
+                egui::TextEdit::singleline(&mut self.headword_language)
+                    .hint_text("Any (e.g. es)")
+                    .desired_width(115.0),
+            );
+            ui.label("Definition language");
+            let meaning = ui.add(
+                egui::TextEdit::singleline(&mut self.definition_language)
+                    .hint_text("Any (e.g. en)")
+                    .desired_width(115.0),
+            );
+            if word.changed() || meaning.changed() {
+                self.dispatch_search();
+            }
         });
         ui.add_space(8.0);
 
