@@ -176,11 +176,14 @@ mod tests {
         let exact = store
             .search_ranked("CASA", SearchFilters::default(), 10)
             .unwrap();
-        assert_eq!(exact.len(), 3);
-        assert!(exact.iter().all(|hit| hit.exact));
+        assert_eq!(exact.len(), 4);
+        assert!(exact.iter().take(3).all(|hit| hit.exact));
+        assert!(!exact[3].exact);
+        assert_eq!(exact[3].entry.lemma, "casamiento");
         assert_eq!(
             exact
                 .iter()
+                .take(3)
                 .map(|hit| (
                     hit.entry.source_id.as_str(),
                     hit.entry.source_entry_id.as_str()
