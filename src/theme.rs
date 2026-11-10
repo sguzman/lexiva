@@ -219,7 +219,9 @@ mod tests {
         use super::DarkmanWatcher;
 
         let (client, mut server) = UnixStream::pair().unwrap();
-        server.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        server
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
         let watcher = DarkmanWatcher::from_stream(client, &egui::Context::default()).unwrap();
         let mut command = String::new();
         BufReader::new(server.try_clone().unwrap())
@@ -237,7 +239,10 @@ mod tests {
                 if watcher.latest() == Some(expected) {
                     break;
                 }
-                assert!(Instant::now() < deadline, "Darkman notification not received");
+                assert!(
+                    Instant::now() < deadline,
+                    "Darkman notification not received"
+                );
                 std::thread::sleep(Duration::from_millis(5));
             }
         }
