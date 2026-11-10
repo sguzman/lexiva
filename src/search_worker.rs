@@ -25,6 +25,25 @@ pub enum SearchScope {
 }
 
 impl SearchScope {
+    /// Persist only deliberate scope choices, never guessing All for bad data.
+    pub fn storage_value(&self) -> String {
+        match self {
+            Self::Unselected => "unselected".into(),
+            Self::All => "all".into(),
+            Self::Source(id) => format!("source:{id}"),
+        }
+    }
+
+    pub fn from_storage_value(value: &str) -> Self {
+        match value {
+            "all" => Self::All,
+            value if value.starts_with("source:") && value.len() > 7 => {
+                Self::Source(value[7..].to_owned())
+            }
+            _ => Self::Unselected,
+        }
+    }
+
     pub fn label(&self, sources: &[DictionarySource]) -> String {
         match self {
             Self::Unselected => "Choose a dictionary".to_owned(),

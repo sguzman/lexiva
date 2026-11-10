@@ -1,5 +1,9 @@
 //! Application-controlled appearance; a real Linux system-mode QA pass is still required.
 
+use std::path::Path;
+use std::process::Command;
+use std::sync::Arc;
+
 use eframe::egui;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -48,6 +52,60 @@ impl ThemeChoice {
     }
 }
 
+/// Restore a bounded reader scale; refuse invalid and non-finite values.
+pub fn reader_scale_from_storage(value: Option<&str>) -> f32 {
+    let Some(scale) = value.and_then(|raw| raw.parse::<f32>().ok()) else {
+        return 1.0;
+    };
+    if scale.is_finite() && (0.8..=1.6).contains(&scale) {
+        scale
+    } else {
+        1.0
+    }
+}
+
+/// Use the locally selected Fontconfig sans-serif, retaining embedded egui
+/// fonts for fallback glyphs. Lexiva never bundles third-party font files.
+pub fn configure_system_font(ctx: &egui::Context) {
+    let Ok(output) = Command::new("fc-match")
+        .args(["-f", "%{file}\\n", "sans-serif"])
+        .output()
+    else {
+        return;
+    };
+    if !output.status.success() {
+        return;
+    }
+    let Some(filename) = std::str::from_utf8(&output.stdout)
+        .ok()
+        .and_then(|output| output.lines().next())
+    else {
+        return;
+    };
+    let path = Path::new(filename);
+    if !path.is_absolute() {
+        return;
+    }
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return;
+    };
+    if !metadata.is_file() || metadata.len() > 16 * 1024 * 1024 {
+        return;
+    }
+    let Ok(bytes) = std::fs::read(path) else {
+        return;
+    };
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "lexiva_system".to_owned(),
+        Arc::new(egui::FontData::from_owned(bytes)),
+    );
+    if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+        family.insert(0, "lexiva_system".to_owned());
+        ctx.set_fonts(fonts);
+    }
+}
+
 /// Identity colors derived from the Lexiva name (OKLCH hue 16°).
 /// Accessible contrast and external Hyprland theme changes require runtime QA.
 pub fn configure_palette(ctx: &egui::Context) {
@@ -64,7 +122,7 @@ pub fn configure_palette(ctx: &egui::Context) {
 
 #[cfg(test)]
 mod tests {
-    use super::ThemeChoice;
+    use super::{ThemeChoice, reader_scale_from_storage};
 
     #[test]
     fn persistent_values_round_trip() {
@@ -73,6 +131,16 @@ mod tests {
                 ThemeChoice::from_storage_value(mode.storage_value()),
                 Some(mode)
             );
+        }
+    }
+
+    #[test]
+    fn reader_scale_rejects_invalid_or_unbounded_preferences() {
+        assert_eq!(reader_scale_from_storage(None), 1.0);
+        assert_eq!(reader_scale_from_storage(Some("1.4")), 1.4);
+        assert_eq!(reader_scale_from_storage(Some("0.8")), 0.8);
+        for raw in ["", "nan", "inf", "-1", "0.2", "1.7", "broken"] {
+            assert_eq!(reader_scale_from_storage(Some(raw)), 1.0);
         }
     }
 

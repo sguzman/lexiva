@@ -12,6 +12,10 @@ use crate::storage::SearchHit;
 use crate::theme::{self, ThemeChoice};
 
 const THEME_KEY: &str = "lexiva.appearance.v1";
+const READER_SCALE_KEY: &str = "lexiva.reader_scale.v1";
+const SCOPE_KEY: &str = "lexiva.search_scope.v1";
+const HEADWORD_LANGUAGE_KEY: &str = "lexiva.headword_language.v1";
+const DEFINITION_LANGUAGE_KEY: &str = "lexiva.definition_language.v1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct EntryKey {
@@ -74,6 +78,7 @@ impl SearchHistory {
 
 pub struct LexivaApp {
     theme: ThemeChoice,
+    reader_scale: f32,
     query: String,
     headword_language: String,
     definition_language: String,
@@ -93,6 +98,25 @@ pub struct LexivaApp {
 impl LexivaApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         theme::configure_palette(&cc.egui_ctx);
+        theme::configure_system_font(&cc.egui_ctx);
+        let reader_scale = theme::reader_scale_from_storage(
+            cc.storage
+                .and_then(|storage| storage.get_string(READER_SCALE_KEY))
+                .as_deref(),
+        );
+        let scope = cc
+            .storage
+            .and_then(|storage| storage.get_string(SCOPE_KEY))
+            .map(|value| SearchScope::from_storage_value(&value))
+            .unwrap_or_default();
+        let headword_language = cc
+            .storage
+            .and_then(|storage| storage.get_string(HEADWORD_LANGUAGE_KEY))
+            .unwrap_or_default();
+        let definition_language = cc
+            .storage
+            .and_then(|storage| storage.get_string(DEFINITION_LANGUAGE_KEY))
+            .unwrap_or_default();
         let theme = cc
             .storage
             .and_then(|storage| storage.get_string(THEME_KEY))
@@ -128,10 +152,11 @@ impl LexivaApp {
         };
         let mut app = Self {
             theme,
+            reader_scale,
             query: String::new(),
-            headword_language: String::new(),
-            definition_language: String::new(),
-            scope: SearchScope::Unselected,
+            headword_language,
+            definition_language,
+            scope,
             worker,
             manager,
             serial: 0,
@@ -185,6 +210,15 @@ impl LexivaApp {
             self.hits = update.hits;
             self.suggestions = update.suggestions;
             self.error = update.error;
+            // Removed or disabled sources never silently turn into an All search.
+            if let SearchScope::Source(id) = &self.scope
+                && !self.sources.iter().any(|source| &source.id == id)
+                && self.error.is_none()
+            {
+                self.scope = SearchScope::Unselected;
+                self.dispatch_search();
+                return;
+            }
             if !self
                 .selected
                 .as_ref()
@@ -399,6 +433,18 @@ impl eframe::App for LexivaApp {
             ui.colored_label(ui.visuals().error_fg_color, error);
         }
         ui.separator();
+        ui.horizontal(|ui| {
+            ui.label("Definition text size");
+            ui.add(
+                egui::Slider::new(&mut self.reader_scale, 0.8..=1.6)
+                    .step_by(0.1)
+                    .show_value(false),
+            );
+            ui.weak(format!("{:.0}%", self.reader_scale * 100.0));
+            if ui.small_button("Reset").clicked() {
+                self.reader_scale = 1.0;
+            }
+        });
 
         if self.hits.is_empty() {
             self.render_empty(ui);
@@ -463,7 +509,7 @@ impl eframe::App for LexivaApp {
                         .as_ref()
                         .and_then(|key| self.hits.iter().find(|hit| key.matches(hit)));
                     if let Some(hit) = selected {
-                        reader::show(ui, hit);
+                        reader::show(ui, hit, self.reader_scale);
                     } else {
                         ui.weak("Choose a search result to read its definitions.");
                     }
@@ -473,6 +519,10 @@ impl eframe::App for LexivaApp {
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string(THEME_KEY, self.theme.storage_value().to_owned());
+        storage.set_string(READER_SCALE_KEY, format!("{:.1}", self.reader_scale));
+        storage.set_string(SCOPE_KEY, self.scope.storage_value());
+        storage.set_string(HEADWORD_LANGUAGE_KEY, self.headword_language.clone());
+        storage.set_string(DEFINITION_LANGUAGE_KEY, self.definition_language.clone());
     }
 }
 

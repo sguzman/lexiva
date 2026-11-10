@@ -55,9 +55,9 @@ fn append_sense(output: &mut String, sense: &Sense, index: &str) {
     }
 }
 
-pub fn show(ui: &mut egui::Ui, hit: &SearchHit) {
+pub fn show(ui: &mut egui::Ui, hit: &SearchHit, scale: f32) {
     let word = &hit.entry;
-    ui.heading(&word.lemma);
+    ui.label(egui::RichText::new(&word.lemma).strong().size(28.0 * scale));
     ui.add_space(3.0);
     ui.horizontal_wrapped(|ui| {
         if let Some(pos) = &word.part_of_speech {
@@ -85,7 +85,7 @@ pub fn show(ui: &mut egui::Ui, hit: &SearchHit) {
         ui.label(egui::RichText::new("Pronunciation").strong());
         for pronunciation in &word.pronunciations {
             if let Some(ipa) = &pronunciation.ipa {
-                ui.label(ipa);
+                ui.label(egui::RichText::new(ipa).size(16.0 * scale));
             }
             if !pronunciation.labels.is_empty() {
                 ui.weak(pronunciation.labels.join(" · "));
@@ -97,18 +97,18 @@ pub fn show(ui: &mut egui::Ui, hit: &SearchHit) {
     if !word.etymologies.is_empty() {
         ui.label(egui::RichText::new("Etymology").strong());
         for text in &word.etymologies {
-            ui.label(text);
+            ui.label(egui::RichText::new(text).size(16.0 * scale));
         }
         ui.add_space(8.0);
     }
 
-    ui.label(egui::RichText::new("Definitions").strong().size(17.0));
+    ui.label(egui::RichText::new("Definitions").strong().size(18.0 * scale));
     ui.add_space(5.0);
     if word.senses.is_empty() {
         ui.weak("This source has no parsed definitions for this entry.");
     } else {
         for (index, sense) in word.senses.iter().enumerate() {
-            show_sense(ui, sense, &(index + 1).to_string());
+            show_sense(ui, sense, &(index + 1).to_string(), scale);
             ui.add_space(8.0);
         }
     }
@@ -118,7 +118,7 @@ pub fn show(ui: &mut egui::Ui, hit: &SearchHit) {
         ui.label(egui::RichText::new("Forms").strong());
         ui.horizontal_wrapped(|ui| {
             for form in &word.forms {
-                ui.label(&form.spelling);
+                ui.label(egui::RichText::new(&form.spelling).size(16.0 * scale));
                 if !form.tags.is_empty() {
                     ui.weak(format!("({})", form.tags.join(", ")));
                 }
@@ -129,7 +129,7 @@ pub fn show(ui: &mut egui::Ui, hit: &SearchHit) {
         ui.separator();
         ui.label(egui::RichText::new("Related words").strong());
         for relation in &word.relations {
-            ui.label(format!("{} · {}", relation.kind, relation.term));
+            ui.label(egui::RichText::new(format!("{} · {}", relation.kind, relation.term)).size(16.0 * scale));
         }
     }
 
@@ -145,16 +145,16 @@ pub fn show(ui: &mut egui::Ui, hit: &SearchHit) {
     }
 }
 
-fn show_sense(ui: &mut egui::Ui, sense: &Sense, index: &str) {
+fn show_sense(ui: &mut egui::Ui, sense: &Sense, index: &str, scale: f32) {
     let number = sense.number.as_deref().unwrap_or(index);
     if sense.glosses.is_empty() {
         ui.weak(format!("{number}. No gloss in source"));
     } else {
         for (position, gloss) in sense.glosses.iter().enumerate() {
             if position == 0 {
-                ui.label(format!("{number}. {gloss}"));
+                ui.label(egui::RichText::new(format!("{number}. {gloss}")).size(16.0 * scale));
             } else {
-                ui.label(format!("    {gloss}"));
+                ui.label(egui::RichText::new(format!("    {gloss}")).size(16.0 * scale));
             }
         }
     }
@@ -162,7 +162,7 @@ fn show_sense(ui: &mut egui::Ui, sense: &Sense, index: &str) {
         ui.weak(sense.labels.join(" · "));
     }
     for example in &sense.examples {
-        ui.label(egui::RichText::new(&example.text).italics());
+        ui.label(egui::RichText::new(&example.text).italics().size(15.0 * scale));
         if let Some(translation) = &example.translation {
             ui.weak(translation);
         }
@@ -172,7 +172,7 @@ fn show_sense(ui: &mut egui::Ui, sense: &Sense, index: &str) {
     }
     for (position, child) in sense.children.iter().enumerate() {
         ui.indent(format!("sense-{index}-{}", position + 1), |ui| {
-            show_sense(ui, child, &format!("{number}.{}", position + 1));
+            show_sense(ui, child, &format!("{number}.{}", position + 1), scale);
         });
     }
 }
