@@ -399,7 +399,7 @@ impl SourceManager {
                         Command::Refresh => {
                             let _ = outgoing.send(Event::Checked);
                             Ok(None)
-                        },
+                        
                         Command::Reindex(id) => reindex(&mut store, &id, &worker_cancel, &outgoing)
                             .map(|count| Some((id, count))),
                         Command::Scan(path) => match scan(&store, path.as_deref()) {
